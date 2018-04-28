@@ -3,9 +3,11 @@
 
 #
 .DS_Store
+**/.DS_Store
 src/core/*
+#src/input/*
 release/*
-include/Parser.hpp
+# include/Parser.hpp
 
 # Compiled Object files
 *.slo
