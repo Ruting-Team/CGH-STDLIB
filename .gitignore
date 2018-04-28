@@ -1,6 +1,11 @@
 # Prerequisites
 *.d
 
+#
+src/input/parse_file.cpp
+release/*
+include/Parser.hpp
+
 # Compiled Object files
 *.slo
 *.lo
