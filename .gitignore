@@ -2,7 +2,8 @@
 *.d
 
 #
-src/input/parse_file.cpp
+.DS_Store
+src/core/*
 release/*
 include/Parser.hpp
 

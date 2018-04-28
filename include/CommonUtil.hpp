@@ -34,19 +34,19 @@ namespace cgh{
             unordered_set<T1> keySet;
             typename std::unordered_map<T1, T2>::iterator iterator;
             for(iterator = map.begin(); iterator != map.end(); iterator++)
-                keySet.insert(map);
+                keySet.insert(iterator->first);
             return keySet;
         }
         template<class T>
-        static unordered_set<T> union_set(unordered_set<T> set1, unordered_set<T> set2){
-            unordered_set<T> set(set2.begin(),set2.end());
+        static unordered_set<T> union_set(const unordered_set<T>& set1, const unordered_set<T>& set2){
+            unordered_set<T> set(set2.begin(), set2.end());
             typename std::unordered_set<T>::iterator iter=set1.begin();
-            for(iter = set1.begin(); iter != set2.end(); iter++)
+            for(iter = set1.begin(); iter != set1.end(); iter++)
                 set.insert(*iter);
             return set;
         }
         template<class T>
-        static unordered_set<T> intersection_set(unordered_set<T> set1, unordered_set<T> set2){
+        static unordered_set<T> intersection_set(const unordered_set<T> set1, const unordered_set<T> set2){
             unordered_set<T> set;
             typename std::unordered_set<T>::iterator iter=set1.begin();
             for(iter = set1.begin(); iter != set1.end(); iter++)
