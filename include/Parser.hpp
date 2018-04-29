@@ -2,6 +2,7 @@
 #define PARSER_HPP
 	// #include <string>
 	#include <iostream>
+	#include <fstream>
 	#include <sstream>
 	#include <set>
 	#include <vector>
@@ -117,15 +118,17 @@
 		private:
 			string fileName;
 			RawFaData rawData; 
+			fstream fin;
+
 		public:
 			/**
 			 * constructor
 			 * report error when fileName not found
 			 */
 			Parser(string fileName): fileName(fileName) {
-				FILE* fp = freopen(fileName.c_str(), "r", stdin);
+				fin.open(fileName, fstream::in);
 				string info = fileName + " not found or open failed!";
-				if (fp == NULL) {
+				if (!fin.is_open()) {
 					ErrorReport::report(info, ERROR);
 				}
 			}
@@ -134,7 +137,11 @@
 			 * @return [RawFaData]
 			 */
 			RawFaData& parse();
-
+			void close() {
+				if (fin.is_open()) {
+					fin.close();
+				}
+			}
 		private:
 			void parseComment();
 			string parseType();

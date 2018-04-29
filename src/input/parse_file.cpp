@@ -10,6 +10,7 @@ namespace cgh {
 		RawFaData* raw = new RawFaData();
 		// parse type
 		string type = parseType();
+		// cout << "type: " << type << endl;
 		RawFaData& rawData = *raw;
 		
 		rawData.type = type;
@@ -53,6 +54,9 @@ namespace cgh {
 			parseTransitions<string>(rawStringData->transitions);
 		}
 
+		close();
+		
+
 		return rawData;
 	}
 
@@ -61,9 +65,9 @@ namespace cgh {
 	 */
 	void Parser::parseComment() {
 		string word;
-		while (cin >> word) {
+		while (fin >> word) {
 			if (word.find("#") == 0) {
-				getline(cin, word);
+				getline(fin, word);
 			} else {
 				break;
 			}
@@ -79,7 +83,7 @@ namespace cgh {
 	string Parser::parseType() {
 		parseComment();
 		string type;
-		cin >> type;
+		fin >> type;
 		return type;
 	}
 
@@ -93,7 +97,7 @@ namespace cgh {
 	void Parser::parseAlphabet(set<T>& alphabet) {
 		parseComment();
 		string line;
-		getline(cin, line);
+		getline(fin, line);
 		stringstream stream;
 		stream << line;
 		T ch;
@@ -111,7 +115,7 @@ namespace cgh {
 	int Parser::parseStateNumber() {
 		parseComment();
 		int number;
-		cin >> number;
+		fin >> number;
 		return number;
 	}
 
@@ -124,7 +128,7 @@ namespace cgh {
 	int Parser::parseInitialState() {
 		parseComment();
 		int initial;
-		cin >> initial;
+		fin >> initial;
 		return initial;
 	}
 
@@ -137,7 +141,7 @@ namespace cgh {
 	void Parser::parseFinalStates(set<int>& finalStates) {
 		parseComment();
 		string line;
-		getline(cin, line);
+		getline(fin, line);
 		stringstream stream;
 		stream << line;
 		int state;
@@ -158,7 +162,7 @@ namespace cgh {
 		int src;
 		T ch;
 		int dst;
-		while(cin >> src >> ch >> dst) {
+		while(fin >> src >> ch >> dst) {
 			transitions.push_back(make_tuple(src, ch, dst));
 		}
 	}

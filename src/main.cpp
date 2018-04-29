@@ -3,13 +3,7 @@
 
 using namespace cgh;
 
-int main(int argc, char const *argv[])
-{
-	cout << "Hello, CGH!" << endl;
-	string fileName = "mini.fa";
-	if (argc > 1) {
-		fileName = argv[1];
-	}
+void test(string fileName) {
 	Parser parser(fileName);
 	RawFaData data = parser.parse();
 	cout << "type: " << data.type << endl;
@@ -58,6 +52,21 @@ int main(int argc, char const *argv[])
 		}
 		delete rawIntData;
 	}
+
+}
+
+int main(int argc, char const *argv[])
+{
+	cout << "Hello, CGH!" << endl;
+	string fileName = "mini.fa";
+	if (argc > 1) {
+		fileName = argv[1];
+	}
+
+	test(fileName);
+
+	test("mini2.fa");
+	
 	
 	
 	return 0;
