@@ -93,7 +93,7 @@ namespace cgh{
             size_t operator()(const StateSet stateSet) const
             {
                 size_t size = (size_t)(*stateSet.begin());
-                StateSetIter iter;
+                StateSetConstIter iter;
                 for(iter = stateSet.begin(); iter != stateSet.end(); ++iter)
                     size=size ^ (size_t)(*iter);
                 return size;
@@ -105,8 +105,8 @@ namespace cgh{
             {
                 if(stateSet1.size() != stateSet2.size())
                     return 0;
-                StateSetIter iter1 = stateSet1.begin();
-                StateSetIter iter2 = stateSet2.begin();
+                StateSetConstIter iter1 = stateSet1.begin();
+                StateSetConstIter iter2 = stateSet2.begin();
                 while(iter1 != stateSet1.end())
                     if(*iter1++ != *iter2++)
                         return 0;
