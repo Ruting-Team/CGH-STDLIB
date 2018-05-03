@@ -8,6 +8,7 @@
 #ifndef FA_hpp
 #define FA_hpp
 
+#include <climits>
 #include <set>
 #include <regex>
 #include <string>
@@ -17,10 +18,11 @@
 #include <unordered_map>
 #include <unordered_set>
 #include "CommonUtil.hpp"
+#include "Parser.hpp"
 
 using namespace std;
 namespace cgh{
-#define EPSILON -1
+#define EPSILON INT_MIN
     class State;
     class NFAState;
     class FA;
@@ -28,7 +30,7 @@ namespace cgh{
     class DFA;
     typedef int Character;
     typedef long ID;
-    typedef unsigned Flag;
+    typedef char Flag;
     typedef vector<Character> Word;
     typedef pair<State*, State*> StatePair;
     typedef unordered_set<FA*> FASet;
@@ -66,16 +68,16 @@ namespace cgh{
         State():id(counter++),flag(0){}
         virtual ~State(){}
         void setFinalFlag(bool b){flag = b ? (flag | 1):(flag & ~1);}
-        void setVisitedFlag(bool b){flag = b ? (flag | 1<<1):(flag & ~1);}
-        void setLiveFlag(bool b){flag = b ? (flag | (1<<2)):(flag & ~(1<<2));}
-        void setEpsilonFlag(bool b){flag = b ? (flag | (1<<3)):(flag & ~(1<<1));}
+        void setVisitedFlag(bool b){flag = b ? (flag | (1<<1)):(flag & ~(1<<1));}
+        void setValidFlag(bool b){flag = b ? (flag | (1<<2)):(flag & ~(1<<2));}
+        void setEpsilonFlag(bool b){flag = b ? (flag | (1<<3)):(flag & ~(1<<3));}
         virtual const StateSet getTargetStateSet() = 0;
     public:
         ID getID(){return id;}
         bool isFinal(){return (flag & 1) == 1;}
-        bool isVisited(){return (flag & 1<<1) == 1;}
-        bool isLive(){return (flag & (1<<2)) == 1;}
-        bool hasEpsilonTrans(){return (flag & (1<<3)) == 1;}
+        bool isVisited(){return (flag & 1<<1) == (1<<1);}
+        bool isValid(){return (flag & (1<<2)) == (1<<2);}
+        bool hasEpsilonTrans(){return (flag & (1<<3)) == (1<<3);}
         
         friend FA;
         friend NFA;
@@ -200,6 +202,7 @@ namespace cgh{
         bool delDFATrans(Character character);//todo
         void output(){
             DFATransMapIter iter;
+            cout<<isFinal()<<endl;
             for(iter = dfaTransMap.begin(); iter != dfaTransMap.end(); iter++) {
                 cout<< getID()<<" "<<iter->first<<" "<<iter->second->getID()<<endl;
         }
@@ -216,30 +219,42 @@ namespace cgh{
         StateSet stateSet;
         StateSet finalStateSet;
         Alphabet alphabet;
-        FA():initialState(NULL){}
-        FA(regex regularExecption){}//todo
+        Flag flag;
+        FA():initialState(NULL),flag(0){}
+        FA(regex regularExpression){}//todo
         FA(FILE *file){}//todo
         virtual ~FA(){}
+        void setDeterminateFlag(bool b){flag = b ? (flag | 1):(flag & ~1);}
+        void setReachableFlag(bool b){flag = b ? (flag | (1<<1)):(flag & ~(1<<1));}
     public:
+        bool isDeterminate(){return (flag & 1) == 1;}
+        bool isReachable(){return (flag & 1<<1) == (1<<1);}
         bool hasFinalState(const StateSet& stateSet)const;
+        void setAlphabet(Alphabet charSet){alphabet.clear(); alphabet.insert(charSet.begin(),charSet.end());}
+        void addAlphabet(Alphabet charSet){alphabet.insert(charSet.begin(),charSet.end());}
+        void setAlphabet(set<int> charSet){alphabet.clear(); alphabet.insert(charSet.begin(),charSet.end());}
+        void addAlphabet(set<int> charSet){alphabet.insert(charSet.begin(),charSet.end());}
         virtual FA &operator &(const FA &fa) = 0;//intersection
         virtual FA &operator |(const FA &fa) = 0;//union
         virtual FA &operator +(const FA &fa) = 0;//concatination
         virtual FA &operator !( void ) = 0;//complement
+        virtual FA &operator -(const FA &fa) = 0;//minus
+        virtual DFA &toDFA() = 0;
+        virtual NFA &toNFA() = 0;
         virtual FA &getSubFA(State *iState, State *fState) = 0;
         virtual void removeUnreachableState() = 0;
         virtual void removeDeadState() = 0;
         virtual Word getOneRun() = 0;
         virtual bool isReachability(Word word) = 0;
-        virtual void output() = 0;
-        bool isEmpty();
+        virtual void output()const = 0;
         static FA &multiIntersection(FASet &faset);//todo
         static FA &multiConcatination(FASet &faset);//todo
         static FA &multiUnion(FASet &faset);//todo
-        static bool multiIntersectionIsEmpty(FASet &faset);//todo
-        virtual FA &operator -(FA &fa) = 0;//minus
-        bool operator ==(FA &fa ){return (*this - fa).isEmpty()&&(fa - *this).isEmpty();}
-        bool operator <=(FA &fa ){return (*this - fa).isEmpty();}
+        static FA &EmptyFA();//todo
+        static FA &CompleteFA();//todo
+        bool isEmpty();
+        bool operator ==(const FA &fa ){return (*this <= fa) && (const_cast<FA&>(fa) <= *this);}
+        bool operator <=(const FA &fa ){return const_cast<FA&>(*this - fa).isEmpty();}
 //        void resetVisitedFlag()
 //        {StateSetIter iter; for(iter=stateSet.begin();iter!=stateSet.end();iter++) (*iter)->setVisitedFlag(0);}
         friend DFA;
@@ -255,13 +270,14 @@ namespace cgh{
         void makeCopyTransByNFA(NFAState* state, State2Map& state2map);
     public:
         NFA(){}
-        NFA(const NFA& dfa);
+        NFA(RawFaData& data);
+        NFA(const NFA& nfa);
         NFA(DFA& dfa);
         ~NFA(){}
         FA &operator &(const FA &fa);
         FA &operator |(const FA &fa);
         FA &operator +(const FA &fa);
-        FA &operator -(FA &fa);
+        FA &operator -(const FA &fa);
         FA &operator !( void );
         FA &getSubFA(State *iState, State *fState);
         void removeUnreachableState();
@@ -271,10 +287,11 @@ namespace cgh{
         NFAState *mkNFAState();
         NFAState *mkNFAInitialState();
         NFAState *mkNFAFinalState();
-        DFA &toDFA()const;
+        DFA &toDFA();
+        NFA &toNFA();
         bool hasEpsilon();
         void removeEpsilon();
-        void output(){
+        void output()const{
             StateSetIter iter;
             for(iter = stateSet.begin(); iter != stateSet.end(); iter++)
                 dynamic_cast<NFAState*>((*iter))->output();
@@ -300,13 +317,13 @@ namespace cgh{
         
     public:
         DFA(){}
-        DFA(Alphabet& charSet){alphabet = charSet;}
+        DFA(RawFaData& data);
         DFA(const DFA& dfa);
         ~DFA(){}
         FA &operator &(const FA &fa);
         FA &operator |(const FA &fa);
         FA &operator +(const FA &fa);
-        FA &operator -(FA &fa);
+        FA &operator -(const FA &fa);
         FA &operator !( void );
         FA &getSubFA(State *iState, State *fState);
         void removeUnreachableState();
@@ -317,8 +334,10 @@ namespace cgh{
         DFAState *mkDFAInitialState();
         DFAState *mkDFAFinalState();
         DFA &minimize();
-        void output(){
-//            dynamic_cast<DFAState*>(initialState)->output();
+        DFA &toDFA();
+        NFA &toNFA();
+        void output()const{
+            dynamic_cast<DFAState*>(initialState)->output();
             StateSetIter iter;
             for(iter = stateSet.begin(); iter != stateSet.end(); iter++)
                 dynamic_cast<DFAState*>((*iter))->output();
