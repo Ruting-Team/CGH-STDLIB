@@ -7,7 +7,7 @@
 #src/input/*
 release/*
 # include/Parser.hpp
-Make.properties
+# Make.properties
 # Compiled Object files
 *.slo
 *.lo
