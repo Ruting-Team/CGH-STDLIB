@@ -292,7 +292,7 @@ namespace cgh{
         bool hasEpsilon();
         void removeEpsilon();
         void output()const{
-            StateSetIter iter;
+            StateSetConstIter iter;
             for(iter = stateSet.begin(); iter != stateSet.end(); iter++)
                 dynamic_cast<NFAState*>((*iter))->output();
         }
@@ -338,7 +338,7 @@ namespace cgh{
         NFA &toNFA();
         void output()const{
             dynamic_cast<DFAState*>(initialState)->output();
-            StateSetIter iter;
+            StateSetConstIter iter;
             for(iter = stateSet.begin(); iter != stateSet.end(); iter++)
                 dynamic_cast<DFAState*>((*iter))->output();
         }

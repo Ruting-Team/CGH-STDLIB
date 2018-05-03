@@ -492,7 +492,7 @@ bool FA::hasFinalState(const StateSet &stateSet)const
 const NFATransMap NFA::getTransMapByStateSet(const StateSet& stateSet)const
 {
     NFATransMap map;
-    StateSetIter iter;
+    StateSetConstIter iter;
     NFATransMapIter mapIter;
     for(iter = stateSet.begin(); iter != stateSet.end(); iter++)
     {
