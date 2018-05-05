@@ -10,6 +10,7 @@
 
 #include <climits>
 #include <set>
+#include <list>
 #include <regex>
 #include <string>
 #include <vector>
@@ -19,141 +20,40 @@
 #include <unordered_set>
 #include "CommonUtil.hpp"
 #include "Parser.hpp"
+#include "State.hpp"
+#include "PDS.hpp"
+
 
 using namespace std;
 namespace cgh{
-#define EPSILON INT_MIN
+#define EPSILON -1
     class State;
     class NFAState;
+    class NTDState;
+    class DTDState;
     class FA;
     class NFA;
     class DFA;
-    typedef int Character;
-    typedef long ID;
-    typedef char Flag;
+    class DTD;
+    class NTD;
+    class PDS;
+
     typedef vector<Character> Word;
     typedef pair<State*, State*> StatePair;
     typedef unordered_set<FA*> FASet;
-    typedef unordered_set<State*> StateSet;
-    typedef unordered_set<Character> Alphabet;
-    typedef unordered_map<State*, State*> State2Map;
     typedef unordered_map<Character, State*> DFATransMap;
     typedef unordered_map<Character, StateSet> NFATransMap;
-    typedef unordered_map<State*, StateSet> State2StateSetMap;
     typedef unordered_map<Character, StatePair> DFAIntersectionMap;
     typedef FASet::iterator FASetIter;
-    typedef StateSet::iterator StateSetIter;
-    typedef Alphabet::iterator AlphabetIter;
-    typedef State2Map::iterator State2MapIter;
     typedef DFATransMap::iterator DFATransMapIter;
     typedef NFATransMap::iterator NFATransMapIter;
-    typedef State2StateSetMap::iterator State2StateSetMapIter;
     typedef DFAIntersectionMap::iterator DFAIntersectionMapIter;
-    typedef StateSet::const_iterator StateSetConstIter;
-    typedef Alphabet::const_iterator AlphabetConstIter;
     typedef DFATransMap::const_iterator DFATransMapConstIter;
     typedef NFATransMap::const_iterator NFATransMapConstIter;
-    typedef State2StateSetMap::const_iterator State2StateSetMapConstIter;
     typedef DFAIntersectionMap::const_iterator DFAIntersectionMapConstIter;
     typedef pair<NFATransMapIter, bool> NFAMapIter;
     typedef pair<DFATransMapIter, bool> DFAMapIter;
     
-    /*****************  class State  *************************************/
-    class State
-    {
-        static long counter;
-    protected:
-        ID id;
-        Flag flag;
-        State():id(counter++),flag(0){}
-        virtual ~State(){}
-        void setFinalFlag(bool b){flag = b ? (flag | 1):(flag & ~1);}
-        void setVisitedFlag(bool b){flag = b ? (flag | (1<<1)):(flag & ~(1<<1));}
-        void setValidFlag(bool b){flag = b ? (flag | (1<<2)):(flag & ~(1<<2));}
-        void setEpsilonFlag(bool b){flag = b ? (flag | (1<<3)):(flag & ~(1<<3));}
-        virtual const StateSet getTargetStateSet() = 0;
-    public:
-        ID getID(){return id;}
-        bool isFinal(){return (flag & 1) == 1;}
-        bool isVisited(){return (flag & 1<<1) == (1<<1);}
-        bool isValid(){return (flag & (1<<2)) == (1<<2);}
-        bool hasEpsilonTrans(){return (flag & (1<<3)) == (1<<3);}
-        
-        friend FA;
-        friend NFA;
-        friend DFA;
-    };
-    
-    /*****************  class SetMapping  *************************************/
-    class SetMapping
-    {
-    private:
-        struct hashf
-        {
-            size_t operator()(const StateSet stateSet) const
-            {
-                size_t size = (size_t)(*stateSet.begin());
-                StateSetConstIter iter;
-                for(iter = stateSet.begin(); iter != stateSet.end(); ++iter)
-                    size=size ^ (size_t)(*iter);
-                return size;
-            }
-        };
-        struct equalf
-        {
-            int operator()(const StateSet stateSet1, const StateSet stateSet2) const
-            {
-                if(stateSet1.size() != stateSet2.size())
-                    return 0;
-                StateSetConstIter iter1 = stateSet1.begin();
-                StateSetConstIter iter2 = stateSet2.begin();
-                while(iter1 != stateSet1.end())
-                    if(*iter1++ != *iter2++)
-                        return 0;
-                return 1;
-            }
-        };
-        typedef unordered_map<StateSet, State*, hashf, equalf> SetMap;
-        SetMap setMap;
-    public:
-        typedef SetMap::iterator iterator;
-        size_t size( void ) { return setMap.size(); }
-        iterator begin( void ) { return setMap.begin(); }
-        iterator end( void ) { return setMap.end(); }
-        iterator find(StateSet stateSet){ return setMap.find(stateSet); }
-        State* &operator[](StateSet stateSet) { return setMap.operator[](stateSet); }
-    };
-    
-    /*****************  class PairMapping  *************************************/
-    class PairMapping
-    {
-    private:
-        struct hashf
-        {
-            size_t operator()(const StatePair statePair) const
-            {
-                return (size_t)statePair.first ^ (size_t)statePair.second;
-            }
-        };
-        struct equalf
-        {
-            int operator()(const StatePair statePair1, const StatePair statePair2) const
-            {
-                if(statePair1.first == statePair2.first && statePair1.second == statePair2.second)
-                    return true;
-                return false;
-            }
-        };
-        typedef unordered_map<StatePair, State*, hashf, equalf> PairMap;
-        PairMap pairMap;
-    public:
-        typedef PairMap::iterator iterator;
-        size_t size( void ) { return pairMap.size(); }
-        iterator begin( void ) { return pairMap.begin(); }
-        iterator end( void ) { return pairMap.end(); }
-        iterator find(StatePair statePair){ return pairMap.find(statePair); }
-        State* &operator[](StatePair statePair) { return pairMap.operator[](statePair); }
-    };
     
     /*****************  class NFAState  *************************************/
     class NFAState : public State
@@ -161,8 +61,10 @@ namespace cgh{
     private:
         NFATransMap nfaTransMap;
         ~NFAState(){}//todo
-
+        vector<string> getSMV(int id);
     public:
+        NFAState(ID i):State(i){}
+        NFAState():State(){}
         const StateSet getEpsilonClosure();
         const StateSet getTargetStateSet();
         const StateSet getTargetStateSetByChar(Character character);
@@ -192,6 +94,7 @@ namespace cgh{
         DFATransMap dfaTransMap;
         ~DFAState(){}//todo
         size_t TransMapSize(){return dfaTransMap.size();}
+        vector<string> getSMV(int id);
     public:
         const StateSet getTargetStateSet();
         DFAState* getTargetStateByChar(Character character);
@@ -202,7 +105,7 @@ namespace cgh{
         bool delDFATrans(Character character);//todo
         void output(){
             DFATransMapIter iter;
-            cout<<isFinal()<<endl;
+//            cout<<isFinal()<<endl;
             for(iter = dfaTransMap.begin(); iter != dfaTransMap.end(); iter++) {
                 cout<< getID()<<" "<<iter->first<<" "<<iter->second->getID()<<endl;
         }
@@ -248,13 +151,14 @@ namespace cgh{
         virtual bool isReachability(Word word) = 0;
         virtual void output()const = 0;
         static FA &multiIntersection(FASet &faset);//todo
+        static bool multiIntersectionAndDeterminEmptiness(FASet &faset, Alphabet &charSet);//todo
         static FA &multiConcatination(FASet &faset);//todo
         static FA &multiUnion(FASet &faset);//todo
         static FA &EmptyFA();//todo
-        static FA &CompleteFA();//todo
+        static FA &CompleteFA(Alphabet charSet);//todo
         bool isEmpty();
         bool operator ==(const FA &fa ){return (*this <= fa) && (const_cast<FA&>(fa) <= *this);}
-        bool operator <=(const FA &fa ){return const_cast<FA&>(*this - fa).isEmpty();}
+        bool operator <=(const FA &fa ){return (*this - fa).isEmpty();}
 //        void resetVisitedFlag()
 //        {StateSetIter iter; for(iter=stateSet.begin();iter!=stateSet.end();iter++) (*iter)->setVisitedFlag(0);}
         friend DFA;
@@ -263,11 +167,41 @@ namespace cgh{
     /*****************  class NFA  *************************************/
     class NFA : public FA
     {
+        typedef pair<NFAState*, Character> StateChar;
+        typedef pair<StateChar, Character> StateChar2;
+        typedef set<StateChar> StateCharSet;
+        typedef set<StateChar2> StateChar2Set;
+        typedef unordered_map<Character, StateCharSet> Char2StateCharSetMap;
+        typedef unordered_map<Character, StateChar2Set> Char2StateChar2SetMap;
+        typedef unordered_map<NFAState*, Char2StateCharSetMap> NeedMap;
+        typedef unordered_map<NFAState*, Char2StateChar2SetMap> Need2Map;
+        typedef StateCharSet::iterator StateCharSetIter;
+        typedef StateChar2Set::iterator StateChar2SetIter;
+        typedef NeedMap::iterator NeedMapIter;
+        typedef Need2Map::iterator Need2MapIter;
+        typedef Char2StateCharSetMap::iterator Char2StateCharSetMapIter;
+        typedef Char2StateChar2SetMap::iterator Char2StateChar2SetMapIter;
     private:
         const NFATransMap getTransMapByStateSet(const StateSet& stateSet)const;
         void makeDFATrans(DFAState* preState, SetMapping& setMapping, const NFATransMap& nfaTransMap, DFA* dfa)const;
         void makeCopyTransByDFA(DFAState* state, State2Map& state2map);
         void makeCopyTransByNFA(NFAState* state, State2Map& state2map);
+        
+        bool addNeedMap(NFAState* sState, Character sc, NFAState* tState, Character tc, NeedMap& needMap, Need2Map& need2Map);
+        bool addNeed2Map(NFAState* sState, Character sc, NFAState* tState, Character tc1, Character tc2, NeedMap& needMap, Need2Map& need2Map);//prestar
+        
+        void addPreStarNeedMap(NFAState* sState, Character sc, NFAState* tState, Character tc, NeedMap& needMap, Need2Map& need2Map);//prestar
+        void addPostStarNeedMap(NFAState* sState, Character sc, NFAState* tState, Character tc, NeedMap& needMap, Need2Map& need2Map);//poststar
+        
+        void addPreStarNeed2Map(NFAState* sState, Character sc, NFAState* tState, Character tc1, Character tc2, NeedMap& needMap, Need2Map& need2Map);//prestar
+        void addPostStarNeed2Map(NFAState* sState, Character sc, NFAState* tState, Character tc1, Character tc2, NeedMap& needMap, Need2Map& need2Map);//poststar
+       
+        void addPreStarTrans(NFAState* sState, Character sc, NFAState* tState, Character tc, NeedMap& needMap, Need2Map& need2Map);//prestar
+        void addPreStarTrans(NFAState* sState, Character sc, NFAState* tState, NeedMap& needMap, Need2Map& need2Map);//prestar
+        
+        void addPostStarTrans(NFAState* sState, Character sc, NFAState* tState, Character tc, NeedMap& needMap, Need2Map& need2Map);//poststar
+        void addPostStarTrans(NFAState* sState, Character sc, NFAState* tState, NeedMap& needMap, Need2Map& need2Map);//poststar
+        
     public:
         NFA(){}
         NFA(RawFaData& data);
@@ -287,12 +221,17 @@ namespace cgh{
         NFAState *mkNFAState();
         NFAState *mkNFAInitialState();
         NFAState *mkNFAFinalState();
+        NFAState *mkNFAState(ID i);
+        NFAState *mkNFAInitialState(ID i);
+        NFAState *mkNFAFinalState(ID i);
         DFA &toDFA();
         NFA &toNFA();
+        NFA &postStar(const PDS& pds);
+        NFA &preStar(const PDS& pds);
         bool hasEpsilon();
         void removeEpsilon();
         void output()const{
-            StateSetConstIter iter;
+            StateSetIter iter;
             for(iter = stateSet.begin(); iter != stateSet.end(); iter++)
                 dynamic_cast<NFAState*>((*iter))->output();
         }
@@ -308,7 +247,7 @@ namespace cgh{
         void makeDFAIntersectionTrans(DFAState* preState, PairMapping& pairMapping, const DFAIntersectionMap& dfaIntersectionMap, DFA* dfa);
         void makeCopyTrans(DFAState* state, State2Map& state2map);
         void makeDFAComplementTrans(DFAState* state, DFAState* trapState, State2Map& state2map, DFA* dfa);
-        const StateSet getStateSetByStateSetAndChar(const StateSet &stateSet, Character character);
+//        const StateSet getStateSetByStateSetAndChar(const StateSet &stateSet, Character character);
         const State2StateSetMap getReverseMap();
         const StateSet getRStateSetByStateSetAndRMap(const State2StateSetMap reverseMap, const StateSet stateSet);
         const StateSet getLiveStateSet(const State2StateSetMap reverseMap, const StateSet stateSet);
@@ -337,8 +276,8 @@ namespace cgh{
         DFA &toDFA();
         NFA &toNFA();
         void output()const{
-            dynamic_cast<DFAState*>(initialState)->output();
-            StateSetConstIter iter;
+//            dynamic_cast<DFAState*>(initialState)->output();
+            StateSetIter iter;
             for(iter = stateSet.begin(); iter != stateSet.end(); iter++)
                 dynamic_cast<DFAState*>((*iter))->output();
         }
