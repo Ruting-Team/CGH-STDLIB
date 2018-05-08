@@ -62,18 +62,20 @@ namespace cgh{
         NFATransMap nfaTransMap;
         ~NFAState(){}//todo
         vector<string> getSMV(int id);
+        void getEpsilonClosure(StateSet& epsilonClosure);
+        void getTargetStateSetByChar(StateSet& stateSet, Character character);
+        void getTargetStateSet(StateSet& stateSet);
     public:
         NFAState(ID i):State(i){}
         NFAState():State(){}
-        const StateSet getEpsilonClosure();
         const StateSet getTargetStateSet();
         const StateSet getTargetStateSetByChar(Character character);
         Alphabet getKeySet(){return CommonUtil::getKeySet(nfaTransMap);}
         NFATransMap& getNFATransMap(){return nfaTransMap;}
         bool addNFATrans(Character character, NFAState *target);
         bool addEpsilonTrans(NFAState *target);
-        bool delNFATrans(Character character, NFAState *target);//todo
-        bool delNFATrans(Character character);//todo
+        bool delNFATrans(Character character, NFAState *target);
+        bool delNFATrans(Character character);
         NFAMapIter NFAMapIterator(Character c);
         void output(){
             NFATransMapIter iter;
@@ -84,6 +86,7 @@ namespace cgh{
                     cout<< getID()<<" "<<iter->first<<" "<<(*sIter)->getID()<<endl;
         }
         }
+        friend NFA;
     };
     
     
@@ -95,14 +98,15 @@ namespace cgh{
         ~DFAState(){}//todo
         size_t TransMapSize(){return dfaTransMap.size();}
         vector<string> getSMV(int id);
+        void getTargetStateSet(StateSet& stateSet);
     public:
         const StateSet getTargetStateSet();
         DFAState* getTargetStateByChar(Character character);
         DFATransMap& getDFATransMap(){return dfaTransMap;}
-        bool addDFATrans(Character character, DFAState *target);//todo
-        bool delDFATrans(Character character, DFAState *target);//todo
-        bool delDFATrans(State *target);//todo
-        bool delDFATrans(Character character);//todo
+        bool addDFATrans(Character character, DFAState *target);
+        bool delDFATrans(Character character, DFAState *target);
+        bool delDFATrans(State *target);
+        bool delDFATrans(Character character);
         void output(){
             DFATransMapIter iter;
 //            cout<<isFinal()<<endl;
@@ -123,13 +127,17 @@ namespace cgh{
         StateSet finalStateSet;
         Alphabet alphabet;
         Flag flag;
-        FA():initialState(NULL),flag(0){}
+        ID id;
+        FA():initialState(NULL),flag(0),id(0){}
         FA(regex regularExpression){}//todo
         FA(FILE *file){}//todo
         virtual ~FA(){}
         void setDeterminateFlag(bool b){flag = b ? (flag | 1):(flag & ~1);}
         void setReachableFlag(bool b){flag = b ? (flag | (1<<1)):(flag & ~(1<<1));}
+        static vector<vector<string> > getSMV(FASet &faset);
     public:
+        ID getID(){return id;}
+        void setID(ID i){id = i;}
         bool isDeterminate(){return (flag & 1) == 1;}
         bool isReachable(){return (flag & 1<<1) == (1<<1);}
         bool hasFinalState(const StateSet& stateSet)const;
@@ -137,28 +145,35 @@ namespace cgh{
         void addAlphabet(Alphabet charSet){alphabet.insert(charSet.begin(),charSet.end());}
         void setAlphabet(set<int> charSet){alphabet.clear(); alphabet.insert(charSet.begin(),charSet.end());}
         void addAlphabet(set<int> charSet){alphabet.insert(charSet.begin(),charSet.end());}
+        vector<vector<string> > getSMV();
+        
         virtual FA &operator &(const FA &fa) = 0;//intersection
         virtual FA &operator |(const FA &fa) = 0;//union
-        virtual FA &operator +(const FA &fa) = 0;//concatination
         virtual FA &operator !( void ) = 0;//complement
-        virtual FA &operator -(const FA &fa) = 0;//minus
-        virtual DFA &toDFA() = 0;
-        virtual NFA &toNFA() = 0;
-        virtual FA &getSubFA(State *iState, State *fState) = 0;
+        
+        virtual FA &concat(const FA &fa) = 0;//concatination
+        virtual FA &minus(const FA &fa) = 0;//minus
+        virtual FA &subset(State *iState, State *fState) = 0;
+        virtual DFA &determine() = 0;
+        virtual NFA &nondetermine() = 0;
+        
         virtual void removeUnreachableState() = 0;
         virtual void removeDeadState() = 0;
+        
         virtual Word getOneRun() = 0;
-        virtual bool isReachability(Word word) = 0;
+        virtual bool isReachable(Word word) = 0;
+        
         virtual void output()const = 0;
         static FA &multiIntersection(FASet &faset);//todo
         static bool multiIntersectionAndDeterminEmptiness(FASet &faset, Alphabet &charSet);//todo
+        static bool multiIntersectionAndDeterminEmptiness(list<FASet> &fasetList, FASet &faset, Alphabet &charSet);//todo
         static FA &multiConcatination(FASet &faset);//todo
         static FA &multiUnion(FASet &faset);//todo
         static FA &EmptyFA();//todo
         static FA &CompleteFA(Alphabet charSet);//todo
         bool isEmpty();
         bool operator ==(const FA &fa ){return (*this <= fa) && (const_cast<FA&>(fa) <= *this);}
-        bool operator <=(const FA &fa ){return (*this - fa).isEmpty();}
+        bool operator <=(const FA &fa ){return minus(fa).isEmpty();}
 //        void resetVisitedFlag()
 //        {StateSetIter iter; for(iter=stateSet.begin();iter!=stateSet.end();iter++) (*iter)->setVisitedFlag(0);}
         friend DFA;
@@ -182,8 +197,8 @@ namespace cgh{
         typedef Char2StateCharSetMap::iterator Char2StateCharSetMapIter;
         typedef Char2StateChar2SetMap::iterator Char2StateChar2SetMapIter;
     private:
-        const NFATransMap getTransMapByStateSet(const StateSet& stateSet)const;
-        void makeDFATrans(DFAState* preState, SetMapping& setMapping, const NFATransMap& nfaTransMap, DFA* dfa)const;
+        void getTransMapByStateSet(const StateSet& stateSet, NFATransMap& nfaTransmap);
+        void makeDFATrans(DFAState* preState, SetMapping& setMapping, const NFATransMap& nfaTransMap, DFA* dfa);
         void makeCopyTransByDFA(DFAState* state, State2Map& state2map);
         void makeCopyTransByNFA(NFAState* state, State2Map& state2map);
         
@@ -210,26 +225,29 @@ namespace cgh{
         ~NFA(){}
         FA &operator &(const FA &fa);
         FA &operator |(const FA &fa);
-        FA &operator +(const FA &fa);
-        FA &operator -(const FA &fa);
         FA &operator !( void );
-        FA &getSubFA(State *iState, State *fState);
+        
+        FA &concat(const FA &fa);
+        FA &minus(const FA &fa);
+        FA &subset(State *iState, State *fState);
+        DFA &determine();
+        NFA &nondetermine();
+        
         void removeUnreachableState();
         void removeDeadState();
+        
         Word getOneRun();
-        bool isReachability(Word word);
+        bool isReachable(Word word);
+        
         NFAState *mkNFAState();
         NFAState *mkNFAInitialState();
         NFAState *mkNFAFinalState();
-        NFAState *mkNFAState(ID i);
-        NFAState *mkNFAInitialState(ID i);
-        NFAState *mkNFAFinalState(ID i);
-        DFA &toDFA();
-        NFA &toNFA();
+
         NFA &postStar(const PDS& pds);
         NFA &preStar(const PDS& pds);
         bool hasEpsilon();
         void removeEpsilon();
+        
         void output()const{
             StateSetIter iter;
             for(iter = stateSet.begin(); iter != stateSet.end(); iter++)
@@ -243,16 +261,13 @@ namespace cgh{
     class DFA : public FA
     {
     private:
-        const DFAIntersectionMap getTransMapByStatePair(const StatePair& statePair);
+        void getTransMapByStatePair(const StatePair& statePair, DFAIntersectionMap& dfaIntersectionMap);
         void makeDFAIntersectionTrans(DFAState* preState, PairMapping& pairMapping, const DFAIntersectionMap& dfaIntersectionMap, DFA* dfa);
         void makeCopyTrans(DFAState* state, State2Map& state2map);
         void makeDFAComplementTrans(DFAState* state, DFAState* trapState, State2Map& state2map, DFA* dfa);
-//        const StateSet getStateSetByStateSetAndChar(const StateSet &stateSet, Character character);
-        const State2StateSetMap getReverseMap();
-        const StateSet getRStateSetByStateSetAndRMap(const State2StateSetMap reverseMap, const StateSet stateSet);
-        const StateSet getLiveStateSet(const State2StateSetMap reverseMap, const StateSet stateSet);
-        const StateSet getReachableStateSet(const StateSet stateSet);
-        const StateSet getReachableStateSet();
+        void getReverseMap(State2StateSetMap& reverseMap);
+        void getLiveStateSet(const State2StateSetMap& reverseMap, StateSet& liveStateSet, StateSet& workSet);
+        void getReachableStateSet(StateSet& reachableStateSet, StateSet& workSet);
         
     public:
         DFA(){}
@@ -261,20 +276,26 @@ namespace cgh{
         ~DFA(){}
         FA &operator &(const FA &fa);
         FA &operator |(const FA &fa);
-        FA &operator +(const FA &fa);
-        FA &operator -(const FA &fa);
         FA &operator !( void );
-        FA &getSubFA(State *iState, State *fState);
+        
+        FA &concat(const FA &fa);
+        FA &minus(const FA &fa);
+        FA &subset(State *iState, State *fState);
+        DFA &determine();
+        NFA &nondetermine();
+        DFA &minimize();
+        
         void removeUnreachableState();
         void removeDeadState();
+        
         Word getOneRun();
-        bool isReachability(Word word);
+        bool isReachable(Word word);
+        
         DFAState *mkDFAState();
         DFAState *mkDFAInitialState();
         DFAState *mkDFAFinalState();
-        DFA &minimize();
-        DFA &toDFA();
-        NFA &toNFA();
+        
+        
         void output()const{
 //            dynamic_cast<DFAState*>(initialState)->output();
             StateSetIter iter;
