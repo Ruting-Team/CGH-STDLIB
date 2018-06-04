@@ -1,5 +1,6 @@
 #include <iostream>
 #include "Parser.hpp"
+#include "FA.hpp"
 
 using namespace cgh;
 
@@ -58,14 +59,34 @@ void test(string fileName) {
 int main(int argc, char const *argv[])
 {
 	cout << "Hello, CGH!" << endl;
-	string fileName = "mini.fa";
+    string fileName1 = "";
+    string fileName2 = "";
+    string op = "";
 	if (argc > 1) {
-		fileName = argv[1];
+        fileName1 = argv[1];
+        fileName2 = argv[2];
+        op = argv[3];
 	}
+    Parser parser1(fileName1);
+    Parser parser2(fileName2);
+    RawFaData data1 = parser1.parse();
+    RawFaData data2 = parser2.parse();
+    NFA nfa1(data1);
+    NFA nfa2(data2);
+    nfa1.output();
+    cout<<endl;
+    nfa2.output();
+    cout<<endl; 
+    if(op == "-i") (nfa1 & nfa2).output();
+    else if(op == "-u") (nfa1 | nfa2).output();
+    else if(op == "-c")
+    {
+        (!nfa1).output();
+        cout<<endl;
+        (!nfa1).output();
+    }
 
-	test(fileName);
-
-	test("mini2.fa");
+	
 	
 	
 	

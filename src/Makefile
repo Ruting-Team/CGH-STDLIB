@@ -34,10 +34,8 @@ $(TARGET):$(ALL_OBJS)
 
 .PHONY:clean
 clean:
-	@for i in $(SUBDIRS); do \
-		echo "===> $$i"; \
-		(cd $$i && $(MAKE) clean -f $(MAKEFILE)) || exit 1; \
-		echo "<=== $$i"; \
-	done
-	rm -f $(RELDIR)/$(TARGET)
+	@for i in $(ALL_OBJS); do \
+		echo "$$i"; \
+		rm $$i; \
+		done
 

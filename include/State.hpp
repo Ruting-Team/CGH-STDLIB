@@ -41,11 +41,11 @@ namespace cgh{
     typedef unordered_set<Character> Alphabet;
     typedef unordered_map<State*, State*> State2Map;
     typedef unordered_map<State*, StateSet> State2StateSetMap;
-    typedef unordered_set<State2StateSetMap> StatePairSet;
+//    typedef unordered_set<unordered_map<State*, unordered_set<State*> > > StatePairSet;
     typedef StateSet::iterator StateSetIter;
     typedef Alphabet::iterator AlphabetIter;
     typedef State2Map::iterator State2MapIter;
-    typedef StatePairSet::iterator StatePairSetIter;
+//    typedef unordered_set<unordered_map<State*, unordered_set<State*> > >::iterator StatePairSetIter;
     typedef State2StateSetMap::iterator State2StateSetMapIter;
     typedef StateSet::const_iterator StateSetConstIter;
     typedef Alphabet::const_iterator AlphabetConstIter;

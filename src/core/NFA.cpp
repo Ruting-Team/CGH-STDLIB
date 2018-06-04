@@ -160,10 +160,11 @@ FA &NFA::operator |(const FA &fa)
     if(!fa.initialState) return *this;
     NFA *nfa = new NFA();
     nfa->setAlphabet(alphabet);
-    nfa->addAlphabet(fa.alphabet);
     NFAState* iniState = nfa->mkNFAInitialState();
     NFAState* state1 = nfa->mkNFAState();
     NFAState* state2 = nfa->mkNFAState();
+    if(initialState->isFinal()) nfa->addFinalState(state1);
+    if(fa.initialState->isFinal()) nfa->addFinalState(state2);
     State2Map state2Map1;
     State2Map state2Map2;
     NFA tempnfa = const_cast<FA&>(fa).nondetermine();

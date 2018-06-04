@@ -268,11 +268,11 @@ namespace cgh{
         void removeEpsilon();
         
         void output()const{
-            cout<<stateSet.size()<<endl;
+//            cout<<stateSet.size()<<endl;
             cout<<initialState->getID()<<endl;
             for(StateSetIter iter = stateSet.begin(); iter != stateSet.end(); iter++)
             {
-                if((*iter)->isFinal()) cout<<"$";
+                if((*iter)->isFinal()) cout<<"$"<<(*iter)->getID()<<endl;;
                 dynamic_cast<NFAState*>((*iter))->output();
             }
         }
@@ -323,9 +323,12 @@ namespace cgh{
         
         void output()const{
 //            dynamic_cast<DFAState*>(initialState)->output();
-            StateSetIter iter;
-            for(iter = stateSet.begin(); iter != stateSet.end(); iter++)
+            cout<<initialState->getID()<<endl;
+            for(StateSetIter iter = stateSet.begin(); iter != stateSet.end(); iter++)
+            {
+                if((*iter)->isFinal()) cout<<"$"<<(*iter)->getID()<<endl;;
                 dynamic_cast<DFAState*>((*iter))->output();
+            }
         }
         friend DFAState;
     };
