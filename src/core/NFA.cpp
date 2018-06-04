@@ -351,7 +351,7 @@ void NFA::getLiveStateSet(const State2StateSetMap& reverseMap, StateSet& liveSta
     {
         State2StateSetMapConstIter mapConstIter = reverseMap.find(*iter);
         if(mapConstIter != reverseMap.end())
-        for(StateSetIter iter = mapConstIter->second.begin(); iter != mapConstIter->second.end(); iter++)
+        for(StateSetConstIter iter = mapConstIter->second.begin(); iter != mapConstIter->second.end(); iter++)
             if(liveStateSet.insert(*iter).second)
                 set.insert(*iter);
     }

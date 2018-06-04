@@ -62,11 +62,16 @@ int main(int argc, char const *argv[])
     string fileName1 = "";
     string fileName2 = "";
     string op = "";
+    string str = "";
 	if (argc > 1) {
         fileName1 = argv[1];
         fileName2 = argv[2];
         op = argv[3];
+        str = argv[4];
 	}
+    Word word;
+    for(int i = 0; i < str.size(); i++)
+        word.push_back((int)(str[i] - '0'));
     Parser parser1(fileName1);
     Parser parser2(fileName2);
     RawFaData data1 = parser1.parse();
@@ -76,14 +81,35 @@ int main(int argc, char const *argv[])
     nfa1.output();
     cout<<endl;
     nfa2.output();
-    cout<<endl; 
-    if(op == "-i") (nfa1 & nfa2).output();
-    else if(op == "-u") (nfa1 | nfa2).output();
-    else if(op == "-c")
+    cout<<endl;
+    if(op == "-i")
+    {
+        DFA *dfa = dynamic_cast<DFA*>(&(nfa1 & nfa2));
+        dfa->removeDeadState();
+        dfa->output();
+        
+    }
+    else if(op == "-u")
+    {
+        DFA *dfa = dynamic_cast<DFA*>(&(nfa1 | nfa2).determine());
+        dfa->removeDeadState();
+        dfa->output();
+        cout<< (nfa1 <= (*dfa)) <<endl;
+        cout<< (nfa2 <= (*dfa)) <<endl;
+    }
+    else if(op == "-cat") nfa1.concat(nfa2).determine().output();
+    else if(op == "-com")
     {
         (!nfa1).output();
         cout<<endl;
         (!nfa1).output();
+    }
+    else if(op == "-e") cout<< (nfa1 == nfa2)<<endl;
+    else if(op == "-s") cout<< (nfa1 <= nfa2)<<endl;
+    else if(op == "-r")
+    {
+        cout<< (nfa1.determine().isReachable(word))<<endl;
+        cout<< (nfa2.determine().isReachable(word))<<endl;
     }
 
 	

@@ -269,8 +269,9 @@ namespace cgh{
         
         void output()const{
 //            cout<<stateSet.size()<<endl;
+            if(!initialState) return;
             cout<<initialState->getID()<<endl;
-            for(StateSetIter iter = stateSet.begin(); iter != stateSet.end(); iter++)
+            for(StateSetConstIter iter = stateSet.begin(); iter != stateSet.end(); iter++)
             {
                 if((*iter)->isFinal()) cout<<"$"<<(*iter)->getID()<<endl;;
                 dynamic_cast<NFAState*>((*iter))->output();
@@ -323,8 +324,9 @@ namespace cgh{
         
         void output()const{
 //            dynamic_cast<DFAState*>(initialState)->output();
+            if(!initialState) return;
             cout<<initialState->getID()<<endl;
-            for(StateSetIter iter = stateSet.begin(); iter != stateSet.end(); iter++)
+            for(StateSetConstIter iter = stateSet.begin(); iter != stateSet.end(); iter++)
             {
                 if((*iter)->isFinal()) cout<<"$"<<(*iter)->getID()<<endl;;
                 dynamic_cast<DFAState*>((*iter))->output();
