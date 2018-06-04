@@ -89,6 +89,12 @@ int main(int argc, char const *argv[])
         dfa->output();
         
     }
+    else if(op == "-d")
+    {
+        nfa1.determine().output();
+        cout<<endl;
+        nfa2.determine().output();
+    }
     else if(op == "-u")
     {
         DFA *dfa = dynamic_cast<DFA*>(&(nfa1 | nfa2).determine());

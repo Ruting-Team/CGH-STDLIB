@@ -473,7 +473,7 @@ DFA &NFA::determine()
     NFATransMap nfaTransMap;
     getTransMapByStateSet(set,nfaTransMap);
     DFAState *initialState = dfa->mkDFAInitialState();
-    if(this->initialState->isFinal()) dfa->addFinalState(initialState);
+    if(hasFinalState(set)) dfa->addFinalState(initialState);
     setMapping[set] = initialState;
     makeDFATrans(initialState, setMapping, nfaTransMap, dfa);
     if(dfa->finalStateSet.size() == 0)
