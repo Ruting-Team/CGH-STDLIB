@@ -18,7 +18,9 @@ bool NFAState::addNFATrans(Character character, NFAState *target)
     NFATransMapIter mapIt = nfaTransMap.find(character);
     if(mapIt == nfaTransMap.end())
     {
-        nfaTransMap[character].insert(target);
+        StateSet stateSet;
+        stateSet.insert(target);
+        nfaTransMap[character] = stateSet;
         return true;
     }
     else
@@ -49,6 +51,21 @@ bool NFAState::delNFATrans(Character character, NFAState *target)
                 mapIt->second.erase(sIter);
             return true;
         }
+}
+bool NFAState::delNFATrans(State *target)//modified
+{
+    Alphabet charSet;
+    for(NFATransMapIter iter = nfaTransMap.begin(); iter != nfaTransMap.end(); iter++)
+        if(iter->second.find(target) != iter->second.end())
+        {
+            if(iter->second.size() == 1)
+                charSet.insert(iter->first);
+            else
+                iter->second.erase(target);
+        }
+    for(AlphabetIter iter = charSet.begin(); iter != charSet.end(); iter++)
+        nfaTransMap.erase(*iter);
+    return true;
 }
 bool NFAState::delNFATrans(Character character)
 {
@@ -178,8 +195,8 @@ vector<string> NFAState::getSMV(int id)
         StateSet set = iter->second;
         for(StateSetIter sIter = set.begin(); sIter != set.end(); sIter++)
         {
-            str += to_string((*sIter)->getID()) + ";";
-            strVector.push_back(str);
+            string stateStr = to_string((*sIter)->getID()) + ";";
+            strVector.push_back(str + stateStr);
         }
     }
     return strVector;

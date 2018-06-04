@@ -15,10 +15,9 @@ using namespace cgh;
 /*******************************************************************/
 void NFA::makeCopyTransByDFA(cgh::DFAState *state, State2Map &state2map)
 {
-    DFATransMapIter mapIter;
-    DFATransMap map = state->getDFATransMap();
+    DFATransMap& map = state->getDFATransMap();
     NFAState* preState = dynamic_cast<NFAState*>(state2map[state]);
-    for(mapIter = map.begin(); mapIter != map.end(); mapIter++)
+    for(DFATransMapIter mapIter = map.begin(); mapIter != map.end(); mapIter++)
     {
         NFAState* postState;
         State2MapIter state2MapIter = state2map.find(mapIter->second);
@@ -35,10 +34,9 @@ void NFA::makeCopyTransByDFA(cgh::DFAState *state, State2Map &state2map)
 }
 void NFA::makeCopyTransByNFA(cgh::NFAState *state, State2Map &state2map)
 {
-    NFATransMapIter mapIter;
-    NFATransMap map = state->getNFATransMap();
+    NFATransMap& map = state->getNFATransMap();
     NFAState* preState = dynamic_cast<NFAState*>(state2map[state]);
-    for(mapIter = map.begin(); mapIter != map.end(); mapIter++)
+    for(NFATransMapIter mapIter = map.begin(); mapIter != map.end(); mapIter++)
     {
         NFAState* postState;
         StateSet set = mapIter->second;
@@ -63,6 +61,8 @@ NFA::NFA(const NFA& nfa)
     {
         setAlphabet(nfa.alphabet);
         NFAState* iniState = mkNFAInitialState();
+        if(nfa.initialState->isFinal())
+            addFinalState(iniState);
         State2Map state2Map;
         state2Map[nfa.initialState] = iniState;
         makeCopyTransByNFA(dynamic_cast<NFAState*>(nfa.initialState), state2Map);
@@ -74,6 +74,8 @@ NFA::NFA(DFA& dfa)
     {
         setAlphabet(dfa.alphabet);
         NFAState* iniState = mkNFAInitialState();
+        if(dfa.initialState->isFinal())
+            addFinalState(iniState);
         State2Map state2Map;
         state2Map[dfa.initialState] = iniState;
         makeCopyTransByDFA(dynamic_cast<DFAState*>(dfa.initialState), state2Map);
@@ -200,6 +202,7 @@ FA &NFA::concat(const FA &fa)
     NFAState* state = nfa->mkNFAState();
     State2Map state2Map;
     NFA tempnfa = const_cast<FA&>(fa).nondetermine();
+    if(tempnfa.initialState->isFinal()) nfa->addFinalState(state);
     state2Map[tempnfa.initialState] = state;
     nfa->makeCopyTransByNFA(dynamic_cast<NFAState*>(tempnfa.initialState), state2Map);
     for(iter = fStateSet.begin(); iter != fStateSet.end(); iter++)
@@ -243,23 +246,143 @@ FA &NFA::subset(State *iState, State *fState)
     nfa->removeDeadState();
     return *nfa;
 }
+
+/*******************************************************************/
+/*                                                                 */
+/*  NFA::rightQuotient                                                    */
+/*                                                                 */
+/*******************************************************************/
+
+FA& NFA::rightQuotient(Character character)
+{
+    NFA* nfa = new NFA(*this);
+    StateSet finSteteSet;
+    StateSet tempSet;
+    for(StateSetIter iter = nfa->stateSet.begin(); iter != nfa->stateSet.end(); iter++)
+    {
+        tempSet.clear();
+        dynamic_cast<NFAState*>(*iter)->getTargetStateSetByChar(tempSet, character);
+        if(hasFinalState(tempSet))
+            finSteteSet.insert(*iter);
+    }
+    nfa->finalStateSet.clear();
+    for(StateSetIter iter = finSteteSet.begin(); iter != finSteteSet.end(); iter++)
+        nfa->addFinalState(*iter);
+    return *nfa;
+}
+
 /*******************************************************************/
 /*                                                                 */
 /*  NFA::removeUnreachableState                                    */
 /*                                                                 */
 /*******************************************************************/
+void NFA::getReachableStateSet(StateSet& reachableStateSet, StateSet& workSet)
+{
+    if(workSet.size() == 0) return;
+    StateSet tempSet;
+    StateSet set;
+    for(StateSetIter iter = workSet.begin(); iter != workSet.end(); iter++)
+    {
+        tempSet.clear();
+        dynamic_cast<NFAState*>(*iter)->getTargetStateSet(tempSet);
+        for(StateSetIter iter = tempSet.begin(); iter != tempSet.end(); iter++)
+            if(reachableStateSet.insert(*iter).second)
+                set.insert(*iter);
+    }
+    getReachableStateSet(reachableStateSet, set);
+}
 void NFA::removeUnreachableState()
 {
-    
+    if(!initialState) return;
+    StateSet reachableStateSet;
+    StateSet workSet;
+    workSet.insert(initialState);
+    reachableStateSet.insert(initialState);
+    getReachableStateSet(reachableStateSet, workSet);
+    if(!hasFinalState(reachableStateSet))
+    {
+        initialState = NULL;
+        return;
+    }
+    if(reachableStateSet.size() != this->stateSet.size())
+    {
+        StateSet set;
+        for(StateSetIter iter = stateSet.begin(); iter != stateSet.end(); iter++)
+            if(reachableStateSet.find(*iter) == reachableStateSet.end())
+            {
+                StateSet postStateSet = (*iter)->getTargetStateSet();
+                for(StateSetIter sIter = postStateSet.begin(); sIter != postStateSet.end(); sIter++)
+                    if(reachableStateSet.find(*sIter) != reachableStateSet.end())
+                        dynamic_cast<NFAState*>(*iter)->delNFATrans(*sIter);
+                set.insert(*iter);
+            }
+        for(StateSetIter iter = set.begin(); iter != set.end(); iter++)
+        {
+            stateSet.erase(*iter);
+            delete *iter;
+        }
+    }
+    setReachableFlag(1);
 }
 /*******************************************************************/
 /*                                                                 */
 /*  NFA::removeDeadState                                           */
 /*                                                                 */
 /*******************************************************************/
+void NFA::getReverseMap(State2StateSetMap& reverseMap)
+{
+    for(StateSetIter iter = stateSet.begin(); iter != stateSet.end(); iter++)
+        reverseMap[*iter] = StateSet();
+    for(StateSetIter iter = stateSet.begin(); iter != stateSet.end(); iter++)
+    {
+        NFATransMap &nfaTransMap = dynamic_cast<NFAState*>(*iter)->getNFATransMap();
+        for(NFATransMapIter mapIter = nfaTransMap.begin(); mapIter != nfaTransMap.end(); mapIter++)
+            for(StateSetIter sIter = mapIter->second.begin(); sIter != mapIter->second.end(); sIter++)
+                 reverseMap[*sIter].insert(*iter);
+    }
+}
+
+void NFA::getLiveStateSet(const State2StateSetMap& reverseMap, StateSet& liveStateSet, StateSet& workSet)
+{
+    if(workSet.size() == 0) return;
+    StateSet set;
+    for(StateSetIter iter = workSet.begin(); iter != workSet.end(); iter++)
+    {
+        State2StateSetMapConstIter mapConstIter = reverseMap.find(*iter);
+        if(mapConstIter != reverseMap.end())
+        for(StateSetIter iter = mapConstIter->second.begin(); iter != mapConstIter->second.end(); iter++)
+            if(liveStateSet.insert(*iter).second)
+                set.insert(*iter);
+    }
+    getLiveStateSet(reverseMap, liveStateSet, set);
+}
 void NFA::removeDeadState()
 {
-    
+    if(!initialState) return;
+    State2StateSetMap reverseMap;
+    getReverseMap(reverseMap);
+    StateSet liveStateSet(finalStateSet.begin(), finalStateSet.end());
+    getLiveStateSet(reverseMap, liveStateSet, finalStateSet);
+    if(liveStateSet.find(initialState) == liveStateSet.end())
+    {
+        initialState = NULL;
+        return;
+    }
+    StateSet set;
+    for(StateSetIter iter = stateSet.begin(); iter != stateSet.end(); iter++)
+        if(liveStateSet.find(*iter) == liveStateSet.end())
+        {
+            StateSet preStateSet = reverseMap.find(*iter)->second;
+            for(StateSetIter sIter = preStateSet.begin(); sIter != preStateSet.end(); sIter++)
+                if(liveStateSet.find(*sIter) != liveStateSet.end())
+                    dynamic_cast<NFAState*>(*sIter)->delNFATrans(*iter);
+            set.insert(*iter);
+        }
+    for(StateSetIter iter = set.begin(); iter != set.end(); iter++)
+    {
+        stateSet.erase(*iter);
+        delete *iter;
+    }
 }
 /*******************************************************************/
 /*                                                                 */
@@ -280,6 +403,16 @@ bool NFA::isReachable(Word word)
 {
     return true;
 }
+bool NFA::isReachable(Character character)
+{
+    if(!initialState)
+        return false;
+    StateSet set;
+    dynamic_cast<NFAState*>(initialState)->getTargetStateSetByChar(set, character);
+    if(set.size() == 0) return false;
+    if(hasFinalState(set)) return true;
+    return false;
+}
 
 /*******************************************************************/
 /*                                                                 */
@@ -289,12 +422,11 @@ bool NFA::isReachable(Word word)
 
 void NFA::getTransMapByStateSet(const StateSet& stateSet, NFATransMap& nfaTransMap)
 {
-    NFATransMapIter mapIter;
-    for(StateSetIter iter = stateSet.begin(); iter != stateSet.end(); iter++)
+    for(StateSetConstIter iter = stateSet.begin(); iter != stateSet.end(); iter++)
     {
         NFATransMap& transMap = dynamic_cast<NFAState*>(*iter)->getNFATransMap();
         StateSet set;
-        for(mapIter = transMap.begin(); mapIter != transMap.end(); mapIter++)
+        for(NFATransMapIter mapIter = transMap.begin(); mapIter != transMap.end(); mapIter++)
             if(mapIter->first != EPSILON)
             {
                 set.clear();
@@ -339,8 +471,8 @@ DFA &NFA::determine()
     SetMapping setMapping;
     NFATransMap nfaTransMap;
     getTransMapByStateSet(set,nfaTransMap);
-    NFATransMapIter mapIter;
     DFAState *initialState = dfa->mkDFAInitialState();
+    if(this->initialState->isFinal()) dfa->addFinalState(initialState);
     setMapping[set] = initialState;
     makeDFATrans(initialState, setMapping, nfaTransMap, dfa);
     if(dfa->finalStateSet.size() == 0)
@@ -359,6 +491,23 @@ DFA &NFA::determine()
 NFA& NFA::nondetermine()
 {
     return *this;
+}
+/*******************************************************************/
+/*                                                                 */
+/*  NFA::getStatePairSet                                           */
+/*                                                                 */
+/*******************************************************************/
+void NFA::getStatePairSet(State2StateSetMap& state2StateSetMap, Character character)
+{
+    StateSet set;
+    for(StateSetIter iter = stateSet.begin(); iter != stateSet.end(); iter++)
+    {
+        set.clear();
+        dynamic_cast<NFAState*>(*iter)->getTargetStateSetByChar(set, character);
+        if(set.size() > 0)
+            for(StateSetIter sIter = set.begin(); sIter != set.end(); sIter++)
+                state2StateSetMap[*iter].insert(*sIter);
+    }
 }
 /*******************************************************************/
 /*                                                                 */
@@ -400,7 +549,7 @@ void NFA::addPostStarTrans(NFAState *sState, Character c, NFAState *tState, Need
         StateCharSet stateCharSet = mapIter->second;
         for(StateCharSetIter mIter = stateCharSet.begin(); mIter != stateCharSet.end(); mIter++)
             if(mIter->first->addNFATrans(mIter->second, tState))
-                addPreStarTrans(mIter->first, mIter->second, tState, needMap, need2Map);
+                addPostStarTrans(mIter->first, mIter->second, tState, needMap, need2Map);
     }
 }
 
@@ -408,7 +557,6 @@ void NFA::addPostStarTrans(NFAState *sState, Character c, NFAState *tState, Need
 NFA& NFA::postStar(const PDS& pds)//todo
 {
     NFA* nfa = new NFA(*this);
-    State2Map state2Map;
     NeedMap needMap;
     Need2Map need2Map;
     for(StateSetConstIter iter = pds.stateSet.begin(); iter != pds.stateSet.end(); iter++)
@@ -442,6 +590,9 @@ NFA& NFA::postStar(const PDS& pds)//todo
         Char2 char2 = dynamic_cast<PushConfiguration*>((*iter)->getTargetConfiguration())->getStack();
         nfa->addPostStarNeed2Map(targetState, char2.first, sourceState, sourceChar, char2.second, needMap, need2Map);
     }
+    nfa->getState2Map().insert(state2Map.begin(), state2Map.end());
+    nfa->removeUnreachableState();
+    nfa->removeDeadState();
     return *nfa;
 }
 /*******************************************************************/
@@ -549,16 +700,12 @@ void NFA::addPreStarTrans(NFAState *sState, Character c, NFAState *tState, NeedM
 NFA& NFA::preStar(const PDS& pds)
 {
     NFA* nfa = new NFA(*this);
-    State2Map state2Map;
     NeedMap needMap;
     Need2Map need2Map;
+    State* pdsstate = state2Map.begin()->first;
     for(StateSetConstIter iter = pds.stateSet.begin(); iter != pds.stateSet.end(); iter++)
-    {
-        NFAState* state;
-        if((*iter)->getID() != initialState->getID()) state = nfa->mkNFAState();
-        else state = dynamic_cast<NFAState*>(nfa->initialState);
-        state2Map[*iter] = state;
-    }
+        state2Map[*iter] = nfa->mkNFAState();
+    state2Map[pdsstate] = nfa->initialState;
     for(PDSTransListConstIter iter = pds.pdsPopTransList.begin(); iter != pds.pdsPopTransList.end(); iter++)
     {
         NFAState* sourceState = dynamic_cast<NFAState*>(state2Map[(*iter)->getSourceConfiguration()->getState()]);
@@ -582,6 +729,8 @@ NFA& NFA::preStar(const PDS& pds)
         Char2 char2 = dynamic_cast<PushConfiguration*>((*iter)->getTargetConfiguration())->getStack();
         nfa->addPreStarNeed2Map(sourceState, sourceChar, targetState, char2.first, char2.second, needMap, need2Map);
     }
+    nfa->getState2Map().insert(state2Map.begin(), state2Map.end());
+    nfa->removeUnreachableState();
+    nfa->removeDeadState();
     return *nfa;
-    
 }

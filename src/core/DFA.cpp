@@ -65,6 +65,8 @@ DFA::DFA(const DFA& dfa)
     {
         setAlphabet(dfa.alphabet);
         DFAState* iniState = mkDFAInitialState();
+        if(dfa.initialState->isFinal())
+            addFinalState(iniState);
         State2Map state2Map;
         state2Map[dfa.initialState] = iniState;
         makeCopyTrans(dynamic_cast<DFAState*>(dfa.initialState), state2Map);
@@ -153,17 +155,20 @@ FA &DFA::operator &(const FA &fa)
 {
     DFA* dfa = new DFA();
     if(!initialState || !fa.initialState) return *dfa;
-    Alphabet charSet(alphabet);
-    charSet.insert(fa.alphabet.begin(), fa.alphabet.end());
-    dfa->setAlphabet(charSet);
+    dfa->setAlphabet(alphabet);
     StatePair statePair(initialState, fa.initialState);
     DFAState* iniState = dfa->mkDFAInitialState();
+    if(initialState->isFinal() && fa.initialState->isFinal()) dfa->addFinalState(iniState);
     PairMapping pairMapping;
     pairMapping[statePair] = iniState;
     DFAIntersectionMap dfaIntersectionMap;
     getTransMapByStatePair(statePair, dfaIntersectionMap);
     makeDFAIntersectionTrans(iniState, pairMapping, dfaIntersectionMap, dfa);
-    if(dfa->finalStateSet.size() == 0) return FA::EmptyFA();  //todo to make a NULLFA constFA
+    if(dfa->finalStateSet.size() == 0)
+    {
+        delete dfa;
+        return FA::EmptyFA();
+    }
     dfa->setReachableFlag(1);
     return *dfa;
 }
@@ -229,7 +234,7 @@ void DFA::makeDFAComplementTrans(DFAState *state, DFAState* trapState, State2Map
 {
     Alphabet charSet;
     AlphabetIter AIter;
-    DFATransMap map = state->getDFATransMap();
+    DFATransMap& map = state->getDFATransMap();
     DFATransMapIter mapIter;
     DFAState* preState = dynamic_cast<DFAState*>(state2map[state]);
     for(mapIter = map.begin(); mapIter != map.end(); mapIter++)
@@ -301,6 +306,29 @@ FA &DFA::subset(State *iState, State *fState)
     dfa->removeDeadState();
     return *dfa;
 }
+
+/*******************************************************************/
+/*                                                                 */
+/*  DFA::rightQuotient                                             */
+/*                                                                 */
+/*******************************************************************/
+
+FA& DFA::rightQuotient(Character character)
+{
+    DFA* dfa = new DFA(*this);
+    StateSet finSteteSet;
+    for(StateSetIter iter = dfa->stateSet.begin(); iter != dfa->stateSet.end(); iter++)
+    {
+        State* state = dynamic_cast<DFAState*>(*iter)->getTargetStateByChar(character);
+        if(state && state->isFinal())
+            finSteteSet.insert(*iter);
+    }
+    dfa->finalStateSet.clear();
+    for(StateSetIter iter = finSteteSet.begin(); iter != finSteteSet.end(); iter++)
+        dfa->addFinalState(*iter);
+    return *dfa;
+}
+
 /*******************************************************************/
 /*                                                                 */
 /*  DFA::removeUnreachableState                                    */
@@ -341,16 +369,15 @@ void DFA::removeUnreachableState()
             if(reachableStateSet.find(*iter) == reachableStateSet.end())
             {
                 StateSet postStateSet = (*iter)->getTargetStateSet();
-                StateSetIter sIter;
-                for(sIter = postStateSet.begin(); sIter != postStateSet.end(); sIter++)
+                for(StateSetIter sIter = postStateSet.begin(); sIter != postStateSet.end(); sIter++)
                     if(reachableStateSet.find(*sIter) != reachableStateSet.end())
                         dynamic_cast<DFAState*>(*iter)->delDFATrans(*sIter);
                 set.insert(*iter);
             }
         for(StateSetIter iter = set.begin(); iter != set.end(); iter++)
         {
-            delete *iter;
             stateSet.erase(*iter);
+            delete *iter;
         }
     }
     setReachableFlag(1);
@@ -376,10 +403,10 @@ void DFA::getLiveStateSet(const State2StateSetMap& reverseMap, StateSet& liveSta
 {
     if(workSet.size() == 0) return;
     StateSet set;
-    State2StateSetMapConstIter mapConstIter;
     for(StateSetIter iter = workSet.begin(); iter != workSet.end(); iter++)
     {
-        mapConstIter = reverseMap.find(*iter);
+        State2StateSetMapConstIter mapConstIter = reverseMap.find(*iter);
+        if(mapConstIter != reverseMap.end())
         for(StateSetIter iter = mapConstIter->second.begin(); iter != mapConstIter->second.end(); iter++)
             if(liveStateSet.insert(*iter).second)
                 set.insert(*iter);
@@ -403,16 +430,15 @@ void DFA::removeDeadState()
         if(liveStateSet.find(*iter) == liveStateSet.end())
         {
             StateSet preStateSet = reverseMap.find(*iter)->second;
-            StateSetIter sIter;
-            for(sIter = preStateSet.begin(); sIter != preStateSet.end(); sIter++)
+            for(StateSetIter sIter = preStateSet.begin(); sIter != preStateSet.end(); sIter++)
                 if(liveStateSet.find(*sIter) != liveStateSet.end())
                     dynamic_cast<DFAState*>(*sIter)->delDFATrans(*iter);
             set.insert(*iter);
         }
     for(StateSetIter iter = set.begin(); iter != set.end(); iter++)
     {
-        delete *iter;
         stateSet.erase(*iter);
+        delete *iter;
     }
 }
 
@@ -442,6 +468,16 @@ bool DFA::isReachable(Word word)
         state = state->getTargetStateByChar(word[i]) ;
         if(!state) return false;
     }
+    if(state->isFinal()) return true;
+    return false;
+}
+bool DFA::isReachable(Character character)
+{
+    if(!initialState)
+        return false;
+    DFAState* state = dynamic_cast<DFAState*>(initialState);
+    state = state->getTargetStateByChar(character) ;
+    if(!state) return false;
     if(state->isFinal()) return true;
     return false;
 }

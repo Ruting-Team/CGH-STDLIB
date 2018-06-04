@@ -27,6 +27,7 @@ namespace cgh{
     class FA;
     class NFA;
     class DFA;
+    class Transducer;
     class DTD;
     class NTD;
     class PDS;
@@ -34,14 +35,17 @@ namespace cgh{
     typedef int Character;
     typedef long ID;
     typedef char Flag;
+    typedef size_t Hash;
     typedef pair<State*, State*> StatePair;
     typedef unordered_set<State*> StateSet;
     typedef unordered_set<Character> Alphabet;
     typedef unordered_map<State*, State*> State2Map;
     typedef unordered_map<State*, StateSet> State2StateSetMap;
+    typedef unordered_set<State2StateSetMap> StatePairSet;
     typedef StateSet::iterator StateSetIter;
     typedef Alphabet::iterator AlphabetIter;
     typedef State2Map::iterator State2MapIter;
+    typedef StatePairSet::iterator StatePairSetIter;
     typedef State2StateSetMap::iterator State2StateSetMapIter;
     typedef StateSet::const_iterator StateSetConstIter;
     typedef Alphabet::const_iterator AlphabetConstIter;
@@ -75,6 +79,7 @@ namespace cgh{
         friend FA;
         friend NFA;
         friend DFA;
+        friend Transducer;
         friend NTD;
         friend DTD;
         friend TrNFA;
@@ -87,10 +92,9 @@ namespace cgh{
         {
             size_t operator()(const StateSet stateSet) const
             {
-                size_t size = (size_t)(*stateSet.begin());
-                StateSetConstIter iter;
-                for(iter = stateSet.begin(); iter != stateSet.end(); ++iter)
-                    size=size ^ (size_t)(*iter);
+                size_t size = 0;
+                for(StateSetConstIter iter = stateSet.begin(); iter != stateSet.end(); iter++)
+                    size = size ^ (size_t)(*iter);
                 return size;
             }
         };
@@ -100,10 +104,8 @@ namespace cgh{
             {
                 if(stateSet1.size() != stateSet2.size())
                     return 0;
-                StateSetConstIter iter1 = stateSet1.begin();
-                StateSetConstIter iter2 = stateSet2.begin();
-                while(iter1 != stateSet1.end())
-                    if(*iter1++ != *iter2++)
+                for(StateSetConstIter iter1 = stateSet1.begin(); iter1 != stateSet1.end(); iter1++)
+                    if(stateSet2.find(*iter1) == stateSet2.end())
                         return 0;
                 return 1;
             }
