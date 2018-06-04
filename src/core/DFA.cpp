@@ -77,7 +77,7 @@ DFA::DFA(const DFA& dfa)
 /*  DFA::ConstructionByParser                                      */
 /*                                                                 */
 /*******************************************************************/
-DFA::DFA(RawFaData& data)
+DFA::DFA(const RawFaData& data)
 {
     flag = 0;
     RawFaDataWithInt* rawdata = dynamic_cast<RawFaDataWithInt*>(data.alphabetAndTransitions);
@@ -114,11 +114,6 @@ void DFA::getTransMapByStatePair(const StatePair &statePair, DFAIntersectionMap&
 {
     DFAState* state1 = dynamic_cast<DFAState*>(statePair.first);
     DFAState* state2 = dynamic_cast<DFAState*>(statePair.second);
-    if(state1->TransMapSize() > state2->TransMapSize())
-    {
-        state1 = dynamic_cast<DFAState*>(statePair.second);
-        state2 = dynamic_cast<DFAState*>(statePair.first);
-    }
     DFATransMap &map1 = state1->getDFATransMap();
     DFATransMap &map2 = state2->getDFATransMap();
     for(DFATransMapIter mapIter1 = map1.begin(); mapIter1 != map1.end(); mapIter1++)

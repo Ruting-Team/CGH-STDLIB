@@ -8,15 +8,6 @@
 #ifndef PDS_hpp
 #define PDS_hpp
 
-#include <set>
-#include <regex>
-#include <string>
-#include <vector>
-#include <list>
-#include <stdio.h>
-#include <iostream>
-#include <unordered_map>
-#include <unordered_set>
 #include "CommonUtil.hpp"
 #include "State.hpp"
 
@@ -55,7 +46,6 @@ namespace cgh{
     public:
         Type getType()const{return type;}
         PDSState* getState()const{return state;}
-        virtual size_t getHash()const = 0;
         bool operator ==(const Configuration &config)const;
         virtual void output() = 0;
     };
@@ -67,7 +57,6 @@ namespace cgh{
     public:
         PopConfiguration(){type = 0;}
         PopConfiguration(PDSState* s){state = s; type = 0;}
-        size_t getHash()const{return size_t(state);}
         bool operator ==(const Configuration &config)const
         {
             if(config.getType() != 0) return false;
@@ -86,7 +75,6 @@ namespace cgh{
         ReplaceConfiguration(PDSState* s){state = s; type = 1;}
         ReplaceConfiguration(PDSState* s, Character character){state = s; setStack(character); type = 1;}
         const Character &getStack()const{return stack;}
-        size_t getHash()const{return size_t(state) ^ size_t(stack);}
         bool operator ==(const Configuration &config)const
         {
             if(config.getType() != 1) return false;
@@ -105,7 +93,6 @@ namespace cgh{
         PushConfiguration(PDSState* s){state = s; type = 2;}
         PushConfiguration(PDSState* s, Char2 char2){state = s; setStack(char2); type = 2;}
         const Char2 &getStack()const{return stack;}
-        size_t getHash()const{return size_t(state) ^ size_t(stack.first) ^ size_t(stack.second);}
         bool operator ==(const Configuration &config)const
         {
             if(config.getType() != 2) return false;
@@ -126,7 +113,6 @@ namespace cgh{
         PushNConfiguration(PDSState* s){state = s; type = 3;}
         PushNConfiguration(PDSState* s, CharN charN){state = s; setStack(charN); type = 3;}
         const CharN &getStack()const{return stack;}
-        size_t getHash()const{return size_t(state);}
         bool operator ==(const Configuration &config)const
         {
             if(config.getType() != 3) return false;
@@ -140,7 +126,6 @@ namespace cgh{
     {
     private:
         ~PDSState(){}
-        vector<string> getSMV(int id){vector<string> strvec; return strvec;}
     public:
         const StateSet getTargetStateSet(){StateSet set; return set;}
     };

@@ -13,20 +13,20 @@ using namespace cgh;
 /*  NFAState::addNFATrans                                          */
 /*                                                                 */
 /*******************************************************************/
-bool NFAState::addNFATrans(Character character, NFAState *target)
+bool NFAState::addNFATrans(Character character, const NFAState *target)
 {
     NFATransMapIter mapIt = nfaTransMap.find(character);
     if(mapIt == nfaTransMap.end())
     {
         StateSet stateSet;
-        stateSet.insert(target);
+        stateSet.insert(const_cast<NFAState*>(target));
         nfaTransMap[character] = stateSet;
         return true;
     }
     else
-        return mapIt->second.insert(target).second;
+        return mapIt->second.insert(const_cast<NFAState*>(target)).second;
 }
-bool NFAState::addEpsilonTrans(NFAState *target)
+bool NFAState::addEpsilonTrans(const NFAState *target)
 {
     return addNFATrans(EPSILON, target);
 }
@@ -35,34 +35,35 @@ bool NFAState::addEpsilonTrans(NFAState *target)
 /*  NFAState::delNFATrans                                          */
 /*                                                                 */
 /*******************************************************************/
-bool NFAState::delNFATrans(Character character, NFAState *target)
+bool NFAState::delNFATrans(Character character, const State *target)
 {
     NFATransMapIter mapIt = nfaTransMap.find(character);
     if(mapIt == nfaTransMap.end())
         return false;
     else
         {
-            StateSetIter sIter = mapIt->second.find(target);
-            if(sIter == mapIt->second.end())
-                return false;
-            if(mapIt->second.size() == 1)
-                nfaTransMap.erase(mapIt);
-            else
-                mapIt->second.erase(sIter);
+            StateSetIter sIter = mapIt->second.find(const_cast<State*>(target));
+            if(sIter == mapIt->second.end()) return false;
+            if(mapIt->second.size() == 1) nfaTransMap.erase(mapIt);
+            else mapIt->second.erase(sIter);
             return true;
         }
 }
-bool NFAState::delNFATrans(State *target)//modified
+bool NFAState::delNFATrans(const State *target)
 {
     Alphabet charSet;
+    int count = 0;
     for(NFATransMapIter iter = nfaTransMap.begin(); iter != nfaTransMap.end(); iter++)
-        if(iter->second.find(target) != iter->second.end())
+    {
+        StateSetIter sIter = iter->second.find(const_cast<State*>(target));
+        if(sIter != iter->second.end())
         {
-            if(iter->second.size() == 1)
-                charSet.insert(iter->first);
-            else
-                iter->second.erase(target);
+            count++;
+            if(iter->second.size() == 1) charSet.insert(iter->first);
+            else iter->second.erase(sIter);
         }
+    }
+    if(count == 0) return false;
     for(AlphabetIter iter = charSet.begin(); iter != charSet.end(); iter++)
         nfaTransMap.erase(*iter);
     return true;
@@ -70,8 +71,7 @@ bool NFAState::delNFATrans(State *target)//modified
 bool NFAState::delNFATrans(Character character)
 {
     NFATransMapIter mapIt = nfaTransMap.find(character);
-    if(mapIt == nfaTransMap.end())
-        return false;
+    if(mapIt == nfaTransMap.end()) return false;
     nfaTransMap.erase(mapIt);
     return true;
 }
@@ -83,8 +83,7 @@ bool NFAState::delNFATrans(Character character)
 void NFAState::getEpsilonClosure(StateSet& epsilonClosure)//modified
 {
     NFATransMapIter mapIter = nfaTransMap.find(EPSILON);
-    if(mapIter == nfaTransMap.end())
-        return;
+    if(mapIter == nfaTransMap.end()) return;
     StateSet workSet;
     for(StateSetIter iter = mapIter->second.begin(); iter != mapIter->second.end(); iter++)
         if(epsilonClosure.insert(*iter).second) workSet.insert(*iter);
@@ -104,8 +103,7 @@ const StateSet NFAState::getTargetStateSet()
     {
         tempSet.clear();
         getTargetStateSetByChar(tempSet, iter->first);
-        if(tempSet.size() > 0)
-            stateSet.insert(tempSet.begin(), tempSet.end());
+        if(tempSet.size() > 0) stateSet.insert(tempSet.begin(), tempSet.end());
     }
     return stateSet;
 }
@@ -116,8 +114,7 @@ void NFAState::getTargetStateSet(StateSet& stateSet)
     {
         tempSet.clear();
         getTargetStateSetByChar(tempSet, iter->first);
-        if(tempSet.size() > 0)
-            stateSet.insert(tempSet.begin(), tempSet.end());
+        if(tempSet.size() > 0) stateSet.insert(tempSet.begin(), tempSet.end());
     }
 }
 /*******************************************************************/
@@ -125,7 +122,7 @@ void NFAState::getTargetStateSet(StateSet& stateSet)
 /*  NfaState::getTargetStateSetByChar                              */
 /*                                                                 */
 /*******************************************************************/
-const StateSet NFAState::getTargetStateSetByChar(Character character)//modified
+const StateSet NFAState::getTargetStateSetByChar(Character character)
 {
     StateSet epsilonClosure;
     getEpsilonClosure(epsilonClosure);
@@ -175,8 +172,8 @@ void NFAState::getTargetStateSetByChar(StateSet& stateSet, Character character)
 NFAMapIter NFAState::NFAMapIterator(Character c)
 {
     NFATransMapIter iter = nfaTransMap.find(c);
-    bool b = 1;
-    if(iter == nfaTransMap.end()) b = 0;
+    bool b = true;
+    if(iter == nfaTransMap.end()) b = false;
     return NFAMapIter(iter, b);
 }
 
@@ -185,33 +182,32 @@ NFAMapIter NFAState::NFAMapIterator(Character c)
 /*  NFAState::getSMV                                               */
 /*                                                                 */
 /*******************************************************************/
-vector<string> NFAState::getSMV(int id)
-{
-    string faStr = "state" + to_string(id);
-    vector<string> strVector;
-    for(NFATransMapIter iter = nfaTransMap.begin(); iter != nfaTransMap.end(); iter++)
-    {
-        string str = faStr + " = s" + to_string(getID()) + " & a" + to_string(iter->first) + " = TRUE : s";
-        StateSet set = iter->second;
-        for(StateSetIter sIter = set.begin(); sIter != set.end(); sIter++)
-        {
-            string stateStr = to_string((*sIter)->getID()) + ";";
-            strVector.push_back(str + stateStr);
-        }
-    }
-    return strVector;
-}
+//vector<string> NFAState::getSMV(int id)
+//{
+//    string faStr = "state" + to_string(id);
+//    vector<string> strVector;
+//    for(NFATransMapIter iter = nfaTransMap.begin(); iter != nfaTransMap.end(); iter++)
+//    {
+//        string str = faStr + " = s" + to_string(getID()) + " & a" + to_string(iter->first) + " = TRUE : s";
+//        StateSet set = iter->second;
+//        for(StateSetIter sIter = set.begin(); sIter != set.end(); sIter++)
+//        {
+//            string stateStr = to_string((*sIter)->getID()) + ";";
+//            strVector.push_back(str + stateStr);
+//        }
+//    }
+//    return strVector;
+//}
 
 /*******************************************************************/
 /*                                                                 */
 /*  DFAState::addDFATrans                                          */
 /*                                                                 */
 /*******************************************************************/
-bool DFAState::addDFATrans(Character character, DFAState *target)
+bool DFAState::addDFATrans(Character character, const DFAState *target)
 {
-    if(dfaTransMap.find(character) != dfaTransMap.end())
-        return false;
-    dfaTransMap[character] = target;
+    if(dfaTransMap.find(character) != dfaTransMap.end()) return false;
+    dfaTransMap[character] = (const_cast<DFAState*>(target));
     return true;
 }
 /*******************************************************************/
@@ -219,7 +215,7 @@ bool DFAState::addDFATrans(Character character, DFAState *target)
 /*  DfaState::delDFATrans                                          */
 /*                                                                 */
 /*******************************************************************/
-bool DFAState::delDFATrans(Character character, DFAState *target)
+bool DFAState::delDFATrans(Character character, const State *target)
 {
     DFATransMapIter mapIt = dfaTransMap.find(character);
     if(mapIt != dfaTransMap.end() && mapIt->second == target)
@@ -230,7 +226,7 @@ bool DFAState::delDFATrans(Character character, DFAState *target)
     return false;
 }
 
-bool DFAState::delDFATrans(State *target)//modified
+bool DFAState::delDFATrans(const State *target)
 {
     Alphabet charSet;
     for(DFATransMapIter iter = dfaTransMap.begin(); iter != dfaTransMap.end(); iter++)
@@ -274,7 +270,7 @@ void DFAState::getTargetStateSet(StateSet &stateSet)
 DFAState* DFAState::getTargetStateByChar(Character character)
 {
     DFATransMapIter mapIter = dfaTransMap.find(character);
-    if(mapIter != dfaTransMap.end()) return dynamic_cast<DFAState*>(mapIter->second);
+    if(mapIter != dfaTransMap.end()) return mapIter->second;
     DFAState* null = NULL;
     return null;
 }
@@ -283,14 +279,15 @@ DFAState* DFAState::getTargetStateByChar(Character character)
 /*  DFAState::getSMV                                               */
 /*                                                                 */
 /*******************************************************************/
-vector<string> DFAState::getSMV(int id)
-{
-    vector<string> strVector;
-    string faStr = "state" + to_string(id);
-    for(DFATransMapIter iter = dfaTransMap.begin(); iter != dfaTransMap.end(); iter++)
-    {
-        string str = faStr + " = s" + to_string(getID()) + " & a" + to_string(iter->first) + " = TRUE : s" + to_string(iter->second->getID()) + ";";
-        strVector.push_back(str);
-    }
-    return strVector;
-}
+//vector<string> DFAState::getSMV(int id)
+//{
+//    vector<string> strVector;
+//    string faStr = "state" + to_string(id);
+//    for(DFATransMapIter iter = dfaTransMap.begin(); iter != dfaTransMap.end(); iter++)
+//    {
+//        string str = faStr + " = s" + to_string(getID()) + " & a" + to_string(iter->first) + " = TRUE : s" + to_string(iter->second->getID()) + ";";
+//        strVector.push_back(str);
+//    }
+//    return strVector;
+//}
+

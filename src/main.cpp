@@ -103,34 +103,39 @@ void print(FA& fa, string filename) {
 
 int main(int argc, char const *argv[])
 {
-	cout << "Hello, CGH!" << endl;
+    cout << "Hello, CGH!" << endl;
     string fileName1 = "";
     string fileName2 = "";
     string op = "";
-	if (argc > 1) {
+    if (argc > 1) {
         fileName1 = argv[1];
         fileName2 = argv[2];
         op = argv[3];
-	}
+    }
     Parser parser1(fileName1);
     Parser parser2(fileName2);
-    RawFaData data1 = parser1.parse();
-    RawFaData data2 = parser2.parse();
-    NFA nfa1(data1);
-    NFA nfa2(data2);
+    RawFaData *data1 = &parser1.parse();
+    RawFaData *data2 = &parser2.parse();
+    NFA nfa1(*data1);
+    NFA nfa2(*data2);
     nfa1.output();
     cout<<endl;
     nfa2.output();
-    cout<<endl; 
+    cout<<endl;
 
     print(nfa1, "nfa1.dot");
     print (nfa2, "nfa2.dot");
 
     if (op == "-u") {
 
-    	FA& res = (nfa1 | nfa2).determine().nondetermine();
-    	
-    	print(res, "res.dot");
+        FA& res = (nfa1 | nfa2).determine().nondetermine();
+        
+        print(res, "res.dot");
+    }
+    else if(op == "-d")
+    {
+        FA& res = nfa1.determine().nondetermine();
+        print(res, "res.dot");
     }
     
 

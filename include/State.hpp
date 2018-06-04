@@ -32,21 +32,23 @@ namespace cgh{
     class NTD;
     class PDS;
     class TrNFA;
-    typedef int Character;
+    
     typedef long ID;
     typedef char Flag;
     typedef size_t Hash;
+    typedef int Character;
+    
     typedef pair<State*, State*> StatePair;
     typedef unordered_set<State*> StateSet;
     typedef unordered_set<Character> Alphabet;
     typedef unordered_map<State*, State*> State2Map;
     typedef unordered_map<State*, StateSet> State2StateSetMap;
-//    typedef unordered_set<unordered_map<State*, unordered_set<State*> > > StatePairSet;
+    
     typedef StateSet::iterator StateSetIter;
     typedef Alphabet::iterator AlphabetIter;
     typedef State2Map::iterator State2MapIter;
-//    typedef unordered_set<unordered_map<State*, unordered_set<State*> > >::iterator StatePairSetIter;
     typedef State2StateSetMap::iterator State2StateSetMapIter;
+    
     typedef StateSet::const_iterator StateSetConstIter;
     typedef Alphabet::const_iterator AlphabetConstIter;
     typedef State2Map::const_iterator State2MapConstIter;
@@ -65,7 +67,6 @@ namespace cgh{
         void setValidFlag(bool b){flag = b ? (flag | (1<<2)):(flag & ~(1<<2));}
         void setEpsilonFlag(bool b){flag = b ? (flag | (1<<3)):(flag & ~(1<<3));}
         virtual const StateSet getTargetStateSet() = 0;
-        virtual vector<string> getSMV(int id) = 0;
     public:
         ID getID(){return id;}
         void setID(ID i){id = i;}
@@ -73,8 +74,6 @@ namespace cgh{
         bool isVisited(){return (flag & 1<<1) == (1<<1);}
         bool isValid(){return (flag & (1<<2)) == (1<<2);}
         bool hasEpsilonTrans(){return (flag & (1<<3)) == (1<<3);}
-        void setNULL(){id = -1;}
-        bool isNULL(){return id == -1;}
         
         friend FA;
         friend NFA;

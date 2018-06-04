@@ -13,7 +13,7 @@ using namespace cgh;
 /*  NFA::construction                                              */
 /*                                                                 */
 /*******************************************************************/
-void NFA::makeCopyTransByDFA(cgh::DFAState *state, State2Map &state2map)
+void NFA::makeCopyTransByDFA(DFAState *state, State2Map &state2map)
 {
     DFATransMap& map = state->getDFATransMap();
     NFAState* preState = dynamic_cast<NFAState*>(state2map[state]);
@@ -32,7 +32,7 @@ void NFA::makeCopyTransByDFA(cgh::DFAState *state, State2Map &state2map)
         preState->addNFATrans(mapIter->first, postState);
     }
 }
-void NFA::makeCopyTransByNFA(cgh::NFAState *state, State2Map &state2map)
+void NFA::makeCopyTransByNFA(NFAState *state, State2Map &state2map)
 {
     NFATransMap& map = state->getNFATransMap();
     NFAState* preState = dynamic_cast<NFAState*>(state2map[state]);
@@ -68,7 +68,7 @@ NFA::NFA(const NFA& nfa)
         makeCopyTransByNFA(dynamic_cast<NFAState*>(nfa.initialState), state2Map);
     }
 }
-NFA::NFA(DFA& dfa)
+NFA::NFA(const DFA& dfa)
 {
     if(dfa.initialState)
     {
@@ -81,7 +81,7 @@ NFA::NFA(DFA& dfa)
         makeCopyTransByDFA(dynamic_cast<DFAState*>(dfa.initialState), state2Map);
     }
 }
-NFA::NFA(RawFaData& data)
+NFA::NFA(const RawFaData& data)
 {
     flag = 0;
     RawFaDataWithInt* rawdata = dynamic_cast<RawFaDataWithInt*>(data.alphabetAndTransitions);
@@ -555,7 +555,7 @@ void NFA::addPostStarTrans(NFAState *sState, Character c, NFAState *tState, Need
 }
 
 
-NFA& NFA::postStar(const PDS& pds)//todo
+NFA& NFA::postStar(const PDS& pds, State2Map state2Map)//todo
 {
     NFA* nfa = new NFA(*this);
     NeedMap needMap;
@@ -591,7 +591,6 @@ NFA& NFA::postStar(const PDS& pds)//todo
         Char2 char2 = dynamic_cast<PushConfiguration*>((*iter)->getTargetConfiguration())->getStack();
         nfa->addPostStarNeed2Map(targetState, char2.first, sourceState, sourceChar, char2.second, needMap, need2Map);
     }
-    nfa->getState2Map().insert(state2Map.begin(), state2Map.end());
     nfa->removeUnreachableState();
     nfa->removeDeadState();
     return *nfa;
@@ -698,7 +697,7 @@ void NFA::addPreStarTrans(NFAState *sState, Character c, NFAState *tState, NeedM
             addPreStarNeedMap(mIter->first.first, mIter->first.second, tState, mIter->second, needMap, need2Map);
     }
 }
-NFA& NFA::preStar(const PDS& pds)
+NFA& NFA::preStar(const PDS& pds, State2Map state2Map)
 {
     NFA* nfa = new NFA(*this);
     NeedMap needMap;
@@ -730,7 +729,6 @@ NFA& NFA::preStar(const PDS& pds)
         Char2 char2 = dynamic_cast<PushConfiguration*>((*iter)->getTargetConfiguration())->getStack();
         nfa->addPreStarNeed2Map(sourceState, sourceChar, targetState, char2.first, char2.second, needMap, need2Map);
     }
-    nfa->getState2Map().insert(state2Map.begin(), state2Map.end());
     nfa->removeUnreachableState();
     nfa->removeDeadState();
     return *nfa;

@@ -8,16 +8,6 @@
 #ifndef FA_hpp
 #define FA_hpp
 
-#include <climits>
-#include <set>
-#include <list>
-#include <regex>
-#include <string>
-#include <vector>
-#include <stdio.h>
-#include <iostream>
-#include <unordered_map>
-#include <unordered_set>
 #include "CommonUtil.hpp"
 #include "Parser.hpp"
 #include "State.hpp"
@@ -29,6 +19,7 @@ namespace cgh{
 #define EPSILON -1
     class State;
     class NFAState;
+    class DFAState;
     class NTDState;
     class DTDState;
     class FA;
@@ -41,14 +32,16 @@ namespace cgh{
     typedef vector<Character> Word;
     typedef pair<State*, State*> StatePair;
     typedef unordered_set<FA*> FASet;
-    typedef unordered_map<Character, State*> DFATransMap;
+    typedef unordered_map<Character, DFAState*> DFATransMap;
     typedef unordered_map<Character, StateSet> NFATransMap;
     typedef unordered_map<Character, StatePair> DFAIntersectionMap;
     typedef vector<vector<string> > SMVFormat;
+    
     typedef FASet::iterator FASetIter;
     typedef DFATransMap::iterator DFATransMapIter;
     typedef NFATransMap::iterator NFATransMapIter;
     typedef DFAIntersectionMap::iterator DFAIntersectionMapIter;
+    
     typedef DFATransMap::const_iterator DFATransMapConstIter;
     typedef NFATransMap::const_iterator NFATransMapConstIter;
     typedef DFAIntersectionMap::const_iterator DFAIntersectionMapConstIter;
@@ -61,8 +54,7 @@ namespace cgh{
     {
     private:
         NFATransMap nfaTransMap;
-        ~NFAState(){}//todo
-        vector<string> getSMV(int id);
+        ~NFAState(){}
         void getEpsilonClosure(StateSet& epsilonClosure);
         void getTargetStateSetByChar(StateSet& stateSet, Character character);
         void getTargetStateSet(StateSet& stateSet);
@@ -71,13 +63,12 @@ namespace cgh{
         NFAState():State(){}
         const StateSet getTargetStateSet();
         const StateSet getTargetStateSetByChar(Character character);
-        Alphabet getKeySet(){return CommonUtil::getKeySet(nfaTransMap);}
         NFATransMap& getNFATransMap(){return nfaTransMap;}
-        bool addNFATrans(Character character, NFAState *target);
-        bool addEpsilonTrans(NFAState *target);
-        bool delNFATrans(Character character, NFAState *target);//todo
-        bool delNFATrans(State *target);//todo
-        bool delNFATrans(Character character);//todo
+        bool addNFATrans(Character character, const NFAState *target);
+        bool addEpsilonTrans(const NFAState *target);
+        bool delNFATrans(Character character, const State *target);
+        bool delNFATrans(const State *target);
+        bool delNFATrans(Character character);
         NFAMapIter NFAMapIterator(Character c);
         void output(){
             NFATransMapIter iter;
@@ -97,21 +88,18 @@ namespace cgh{
     {
     private:
         DFATransMap dfaTransMap;
-        ~DFAState(){}//todo
-        size_t TransMapSize(){return dfaTransMap.size();}
-        vector<string> getSMV(int id);
+        ~DFAState(){}
         void getTargetStateSet(StateSet& stateSet);
     public:
         const StateSet getTargetStateSet();
         DFAState* getTargetStateByChar(Character character);
         DFATransMap& getDFATransMap(){return dfaTransMap;}
-        bool addDFATrans(Character character, DFAState *target);//todo
-        bool delDFATrans(Character character, DFAState *target);//todo
-        bool delDFATrans(State *target);//todo
-        bool delDFATrans(Character character);//todo
+        bool addDFATrans(Character character, const DFAState *target);
+        bool delDFATrans(Character character, const State *target);
+        bool delDFATrans(const State *target);
+        bool delDFATrans(Character character);
         void output(){
             DFATransMapIter iter;
-//            cout<<isFinal()<<endl;
             for(iter = dfaTransMap.begin(); iter != dfaTransMap.end(); iter++) {
                 cout<< getID()<<" "<<iter->first<<" "<<iter->second->getID()<<endl;
         }
@@ -128,7 +116,6 @@ namespace cgh{
         StateSet stateSet;
         StateSet finalStateSet;
         Alphabet alphabet;
-        State2Map state2Map;
         Flag flag;
         ID id;
         FA():initialState(NULL),flag(0),id(0){}
@@ -137,14 +124,11 @@ namespace cgh{
         virtual ~FA(){}
         void setDeterminateFlag(bool b){flag = b ? (flag | 1):(flag & ~1);}
         void setReachableFlag(bool b){flag = b ? (flag | (1<<1)):(flag & ~(1<<1));}
-        static void getSMV(FASet &faset, vector<SMVFormat>& SMV, int offset);
     public:
-        static void getSMV(list<FASet> &fasetList, SMVFormat& SMV);
         ID getID(){return id;}
         StateSet& getStateSet(){return stateSet;}
         StateSet& getFinalStateSet(){return finalStateSet;}
         State* getInitialState(){return initialState;}
-        State2Map& getState2Map(){return state2Map;}
         void setID(ID i){id = i;}
         bool isDeterminate(){return (flag & 1) == 1;}
         bool isReachable(){return (flag & 1<<1) == (1<<1);}
@@ -153,7 +137,6 @@ namespace cgh{
         void addAlphabet(Alphabet charSet){alphabet.insert(charSet.begin(),charSet.end());}
         void setAlphabet(set<int> charSet){alphabet.clear(); alphabet.insert(charSet.begin(),charSet.end());}
         void addAlphabet(set<int> charSet){alphabet.insert(charSet.begin(),charSet.end());}
-        void getSMV(SMVFormat& SMV, int id);
         void setInitialState(State* state){initialState = state;}
         void addFinalState(State* state){finalStateSet.insert(state); state->setFinalFlag(1);}
         
@@ -181,6 +164,7 @@ namespace cgh{
         static bool multiIntersectionAndDeterminEmptiness(list<FASet> &fasetList, FASet &faset, Alphabet &charSet);//todo
         static FA &multiConcatination(FASet &faset);
         static FA &multiUnion(FASet &faset);
+        
         static FA &EmptyFA();
         static FA &CompleteFA(Alphabet charSet);
         static FA &SigmaStarFA(Alphabet charSet);
@@ -235,10 +219,11 @@ namespace cgh{
         
     public:
         NFA(){}
-        NFA(RawFaData& data);
+        NFA(const RawFaData& data);
         NFA(const NFA& nfa);
-        NFA(DFA& dfa);
-        ~NFA(){for(StateSetIter iter = stateSet.begin(); iter != stateSet.end(); iter++)delete *iter;}
+        NFA(const DFA& dfa);
+        ~NFA(){
+            for(StateSetIter iter = stateSet.begin(); iter != stateSet.end(); iter++)delete *iter;}
         void getStatePairSet(State2StateSetMap& state2StateSetMap, Character character);
         FA &operator &(const FA &fa);
         FA &operator |(const FA &fa);
@@ -262,8 +247,8 @@ namespace cgh{
         NFAState *mkNFAInitialState();
         NFAState *mkNFAFinalState();
 
-        NFA &postStar(const PDS& pds);
-        NFA &preStar(const PDS& pds);
+        NFA &postStar(const PDS& pds, State2Map state2Map);
+        NFA &preStar(const PDS& pds, State2Map state2Map);
         bool hasEpsilon();
         void removeEpsilon();
         
@@ -295,9 +280,10 @@ namespace cgh{
         
     public:
         DFA(){}
-        DFA(RawFaData& data);
+        DFA(const RawFaData& data);
         DFA(const DFA& dfa);
-        ~DFA(){for(StateSetIter iter = stateSet.begin(); iter != stateSet.end(); iter++)delete *iter;}
+        ~DFA(){
+            for(StateSetIter iter = stateSet.begin(); iter != stateSet.end(); iter++)delete *iter;}
         FA &operator &(const FA &fa);
         FA &operator |(const FA &fa);
         FA &operator !( void );
