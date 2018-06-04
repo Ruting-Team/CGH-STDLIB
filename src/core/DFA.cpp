@@ -178,19 +178,7 @@ FA &DFA::operator |(const FA &fa)
     if(!initialState) return const_cast<FA&>(fa).determine();
     if(!fa.initialState) return determine();
     NFA nfa(*this);
-    nfa.setAlphabet(alphabet);
-    nfa.addAlphabet(fa.alphabet);
-    NFA tempnfa = const_cast<FA&>(fa).nondetermine();
-    NFAState* tempNFAStete1 = dynamic_cast<NFAState*>(nfa.initialState);
-    NFAState* tempNFAStete2 = dynamic_cast<NFAState*>(tempnfa.initialState);
-    State2Map state2Map;
-    NFAState* state = nfa.mkNFAState();
-    state2Map[tempNFAStete2] = state;
-    NFAState* iniState = nfa.mkNFAInitialState();
-    nfa.makeCopyTransByNFA(tempNFAStete2, state2Map);
-    iniState->addEpsilonTrans(tempNFAStete1);
-    iniState->addEpsilonTrans(state);
-    return nfa.determine();
+    return (nfa | fa);
 }
 /*******************************************************************/
 /*                                                                 */
@@ -202,22 +190,7 @@ FA &DFA::concat(const FA &fa)//todo
     if(!initialState) return const_cast<FA&>(fa).determine();
     if(!fa.initialState) return determine();
     NFA nfa(*this);
-    nfa.addAlphabet(fa.alphabet);
-    StateSetIter iter;
-    StateSet fStateSet;
-    fStateSet.insert(nfa.finalStateSet.begin(), nfa.finalStateSet.end());
-    nfa.finalStateSet.clear();
-    NFAState* state = nfa.mkNFAState();
-    State2Map state2Map;
-    NFA tempnfa = const_cast<FA&>(fa).nondetermine();
-    state2Map[tempnfa.initialState] = state;
-    nfa.makeCopyTransByNFA(dynamic_cast<NFAState*>(tempnfa.initialState), state2Map);
-    for(iter = fStateSet.begin(); iter != fStateSet.end(); iter++)
-    {
-        (*iter)->setFinalFlag(0);
-        dynamic_cast<NFAState*>(*iter)->addEpsilonTrans(state);
-    }
-    return nfa.determine();
+    return nfa.concat(fa);
 }
 /*******************************************************************/
 /*                                                                 */
@@ -275,7 +248,10 @@ FA &DFA::operator !( void )
 /*******************************************************************/
 FA &DFA::minus(const FA &fa)
 {
-    return *this & !(const_cast<FA&>(fa));
+    DFA* cDFA = dynamic_cast<DFA*>(&(!(const_cast<FA&>(fa))));
+    DFA* iDFA = dynamic_cast<DFA*>(&(*this & (*cDFA)));
+    delete cDFA;
+    return *iDFA;
 }
 
 /*******************************************************************/
@@ -283,7 +259,7 @@ FA &DFA::minus(const FA &fa)
 /*  DFA::subset                                                    */
 /*                                                                 */
 /*******************************************************************/
-FA &DFA::subset(State *iState, State *fState)
+FA &DFA::subset(const State *iState, const State *fState)
 {
     DFA *dfa = new DFA();
     if(!initialState) return *dfa;
@@ -291,13 +267,11 @@ FA &DFA::subset(State *iState, State *fState)
     DFAState* state = dfa->mkDFAInitialState();
     State2Map state2Map;
     StateSetIter iter;
-    state2Map[iState] = state;
-    dfa->makeCopyTrans(dynamic_cast<DFAState*>(iState), state2Map);
-    for(iter = dfa->finalStateSet.begin(); iter != dfa->finalStateSet.end(); iter++) (*iter)->setFinalFlag(0);
-    dfa->finalStateSet.clear();
-    DFAState* dfaState = dynamic_cast<DFAState*>(state2Map[fState]);
-    dfaState->setFinalFlag(1);
-    dfa->finalStateSet.insert(dfaState);
+    state2Map[const_cast<State*>(iState)] = state;
+    dfa->makeCopyTrans(dynamic_cast<DFAState*>(const_cast<State*>(iState)), state2Map);
+    dfa->clearFinalStateSet();
+    DFAState* dfaState = dynamic_cast<DFAState*>(state2Map[const_cast<State*>(fState)]);
+    dfa->addFinalState(dfaState);
     dfa->removeDeadState();
     return *dfa;
 }
@@ -318,7 +292,7 @@ FA& DFA::rightQuotient(Character character)
         if(state && state->isFinal())
             finSteteSet.insert(*iter);
     }
-    dfa->finalStateSet.clear();
+    dfa->clearFinalStateSet();
     for(StateSetIter iter = finSteteSet.begin(); iter != finSteteSet.end(); iter++)
         dfa->addFinalState(*iter);
     return *dfa;

@@ -2,18 +2,8 @@ digraph {
 rankdir=LR;
 Q0[color=blue];
 node [shape=doublecircle];
-Q6 Q5 ;
+Q1 ;
 node [shape=circle];
-Q6 -> Q6[label="1"];
-Q6 -> Q6[label="0"];
-Q4 -> Q6[label="1"];
-Q3 -> Q5[label="0"];
-Q2 -> Q4[label="1"];
-Q5 -> Q5[label="1"];
-Q5 -> Q5[label="0"];
-Q1 -> Q3[label="0"];
-Q0 -> Q2[label="1"];
-Q0 -> Q1[label="1"];
-Q0 -> Q0[label="1"];
-Q0 -> Q0[label="0"];
+Q1 -> Q1[label="0"];
+Q0 -> Q1[label="0"];
 }

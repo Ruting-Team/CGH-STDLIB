@@ -107,10 +107,21 @@ int main(int argc, char const *argv[])
     string fileName1 = "";
     string fileName2 = "";
     string op = "";
-    if (argc > 1) {
+    string str = "";
+    Word word;
+    if (argc == 4) {
         fileName1 = argv[1];
         fileName2 = argv[2];
         op = argv[3];
+    }
+    else if(argc == 5)
+    {
+        fileName1 = argv[1];
+        fileName2 = argv[2];
+        op = argv[3];
+        str = argv[4];
+        for(int i = 0; i < str.size(); i++)
+            word.push_back((int)(str[i] - '0'));
     }
     Parser parser1(fileName1);
     Parser parser2(fileName2);
@@ -136,6 +147,11 @@ int main(int argc, char const *argv[])
     {
         FA& res = nfa1.determine().nondetermine();
         print(res, "res.dot");
+    }
+    else if(op == "-r")
+    {
+        cout<<nfa1.isReachable(word)<<endl;
+        cout<<nfa2.isReachable(word)<<endl;
     }
     
 

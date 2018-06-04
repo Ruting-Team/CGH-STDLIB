@@ -221,7 +221,10 @@ FA &NFA::concat(const FA &fa)
 /*******************************************************************/
 FA &NFA::minus(const FA &fa)
 {
-    return (determine()) & !(const_cast<FA&>(fa));
+    DFA* cDFA = dynamic_cast<DFA*>(&(!(const_cast<FA&>(fa))));
+    DFA* iDFA = dynamic_cast<DFA*>(&(*this & (*cDFA)));
+    delete cDFA;
+    return *iDFA;
 }
 
 /*******************************************************************/
@@ -229,7 +232,7 @@ FA &NFA::minus(const FA &fa)
 /*  NFA::subset                                                    */
 /*                                                                 */
 /*******************************************************************/
-FA &NFA::subset(State *iState, State *fState)
+FA &NFA::subset(const State *iState, const State *fState)
 {
     NFA *nfa = new NFA();
     if(!initialState) return *nfa;
@@ -237,20 +240,18 @@ FA &NFA::subset(State *iState, State *fState)
     NFAState* iniState = nfa->mkNFAInitialState();
     State2Map state2Map;
     StateSetIter iter;
-    state2Map[iState] = iniState;
-    nfa->makeCopyTransByNFA(dynamic_cast<NFAState*>(iState), state2Map);
-    for(iter = nfa->finalStateSet.begin(); iter != nfa->finalStateSet.end(); iter++) (*iter)->setFinalFlag(0);
-    nfa->finalStateSet.clear();
-    NFAState* nfaState = dynamic_cast<NFAState*>(state2Map[fState]);
-    nfaState->setFinalFlag(1);
-    nfa->finalStateSet.insert(nfaState);
+    state2Map[const_cast<State*>(iState)] = iniState;
+    nfa->makeCopyTransByNFA(dynamic_cast<NFAState*>(const_cast<State*>(iState)), state2Map);
+    nfa->clearFinalStateSet();
+    NFAState* nfaState = dynamic_cast<NFAState*>(state2Map[const_cast<State*>(fState)]);
+    nfa->addFinalState(nfaState);
     nfa->removeDeadState();
     return *nfa;
 }
 
 /*******************************************************************/
 /*                                                                 */
-/*  NFA::rightQuotient                                                    */
+/*  NFA::rightQuotient                                             */
 /*                                                                 */
 /*******************************************************************/
 
@@ -266,7 +267,7 @@ FA& NFA::rightQuotient(Character character)
         if(hasFinalState(tempSet))
             finSteteSet.insert(*iter);
     }
-    nfa->finalStateSet.clear();
+    nfa->clearFinalStateSet();
     for(StateSetIter iter = finSteteSet.begin(); iter != finSteteSet.end(); iter++)
         nfa->addFinalState(*iter);
     return *nfa;
@@ -402,6 +403,25 @@ Word NFA::getOneRun()
 /*******************************************************************/
 bool NFA::isReachable(Word word)
 {
+    if(!initialState)
+        return false;
+    StateSet workSet;
+    workSet.insert(initialState);
+    for(int i = 0; i < word.size(); i++)
+    {
+        if(workSet.size() > 0)
+        {
+            StateSet set;
+            for(StateSetIter iter = workSet.begin(); iter != workSet.end(); iter++)
+                dynamic_cast<NFAState*>(*iter)->getTargetStateSetByChar(set, word[i]);
+            workSet.clear();
+            if(set.size() > 0)
+                workSet.insert(set.begin(), set.end());
+            else return false;
+        }
+    }
+    if(workSet.size() == 0) return false;
+    if(!hasFinalState(workSet)) return false;
     return true;
 }
 bool NFA::isReachable(Character character)
@@ -555,7 +575,7 @@ void NFA::addPostStarTrans(NFAState *sState, Character c, NFAState *tState, Need
 }
 
 
-NFA& NFA::postStar(const PDS& pds, State2Map state2Map)//todo
+NFA& NFA::postStar(const PDS& pds, State2Map& state2Map)//todo
 {
     NFA* nfa = new NFA(*this);
     NeedMap needMap;
@@ -697,7 +717,7 @@ void NFA::addPreStarTrans(NFAState *sState, Character c, NFAState *tState, NeedM
             addPreStarNeedMap(mIter->first.first, mIter->first.second, tState, mIter->second, needMap, need2Map);
     }
 }
-NFA& NFA::preStar(const PDS& pds, State2Map state2Map)
+NFA& NFA::preStar(const PDS& pds, State2Map& state2Map)
 {
     NFA* nfa = new NFA(*this);
     NeedMap needMap;

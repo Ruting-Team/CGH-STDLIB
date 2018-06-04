@@ -16,6 +16,52 @@ bool FA::hasFinalState(const StateSet &stateSet)const
     return false;
 }
 
+void FA::clearFinalStateSet()
+{
+    for(StateSetIter iter = finalStateSet.begin(); iter != finalStateSet.end(); iter++)
+        (*iter)->setFinalFlag(0);
+    finalStateSet.clear();
+}
+
+
+bool FA::operator ==(const FA& fa)
+{
+    DFA* cDFA = dynamic_cast<DFA*>(&(!(const_cast<FA&>(fa))));
+    DFA* iDFA = dynamic_cast<DFA*>(&(*this & (*cDFA)));
+    if(!iDFA->isEmpty())
+    {
+        delete cDFA;
+        delete iDFA;
+        return false;
+    }
+    cDFA = dynamic_cast<DFA*>(&(!(*this)));
+    iDFA = dynamic_cast<DFA*>(&(*cDFA & fa));
+    if(!iDFA->isEmpty())
+    {
+        delete cDFA;
+        delete iDFA;
+        return false;
+    }
+    delete cDFA;
+    delete iDFA;
+    return true;
+}
+
+bool FA::operator <=(const FA& fa)
+{
+    DFA* cDFA = dynamic_cast<DFA*>(&(!(const_cast<FA&>(fa))));
+    DFA* iDFA = dynamic_cast<DFA*>(&(*this & (*cDFA)));
+    if(!iDFA->isEmpty())
+    {
+        delete cDFA;
+        delete iDFA;
+        return false;
+    }
+    delete cDFA;
+    delete iDFA;
+    return true;
+}
+
 /*******************************************************************/
 /*                                                                 */
 /*  FA::mutipleIntersectionAndDeterminEmptiness                    */

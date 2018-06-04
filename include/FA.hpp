@@ -35,7 +35,7 @@ namespace cgh{
     typedef unordered_map<Character, DFAState*> DFATransMap;
     typedef unordered_map<Character, StateSet> NFATransMap;
     typedef unordered_map<Character, StatePair> DFAIntersectionMap;
-    typedef vector<vector<string> > SMVFormat;
+//    typedef vector<vector<string> > SMVFormat;
     
     typedef FASet::iterator FASetIter;
     typedef DFATransMap::iterator DFATransMapIter;
@@ -139,6 +139,7 @@ namespace cgh{
         void addAlphabet(set<int> charSet){alphabet.insert(charSet.begin(),charSet.end());}
         void setInitialState(State* state){initialState = state;}
         void addFinalState(State* state){finalStateSet.insert(state); state->setFinalFlag(1);}
+        void clearFinalStateSet();
         
         virtual FA &operator &(const FA &fa) = 0;//intersection
         virtual FA &operator |(const FA &fa) = 0;//union
@@ -146,7 +147,7 @@ namespace cgh{
         
         virtual FA &concat(const FA &fa) = 0;//concatination
         virtual FA &minus(const FA &fa) = 0;//minus
-        virtual FA &subset(State *iState, State *fState) = 0;
+        virtual FA &subset(const State *iState, const State *fState) = 0;
         virtual FA &rightQuotient(Character character) = 0;
         virtual DFA &determine() = 0;
         virtual NFA &nondetermine() = 0;
@@ -161,7 +162,6 @@ namespace cgh{
         virtual void output()const = 0;
         static FA &multiIntersection(FASet &faset);//todo
         static bool multiIntersectionAndDeterminEmptiness(FASet &faset, Alphabet &charSet);//todo
-        static bool multiIntersectionAndDeterminEmptiness(list<FASet> &fasetList, FASet &faset, Alphabet &charSet);//todo
         static FA &multiConcatination(FASet &faset);
         static FA &multiUnion(FASet &faset);
         
@@ -169,8 +169,8 @@ namespace cgh{
         static FA &CompleteFA(Alphabet charSet);
         static FA &SigmaStarFA(Alphabet charSet);
         bool isEmpty();
-        bool operator ==(const FA &fa ){return (*this <= fa) && (const_cast<FA&>(fa) <= *this);}//need to modiy
-        bool operator <=(const FA &fa ){return minus(fa).isEmpty();}
+        bool operator ==(const FA &fa );//need to modiy
+        bool operator <=(const FA &fa );
 //        void resetVisitedFlag()
 //        {StateSetIter iter; for(iter=stateSet.begin();iter!=stateSet.end();iter++) (*iter)->setVisitedFlag(0);}
         friend DFA;
@@ -231,7 +231,7 @@ namespace cgh{
         
         FA &concat(const FA &fa);
         FA &minus(const FA &fa);
-        FA &subset(State *iState, State *fState);
+        FA &subset(const State *iState, const State *fState);
         FA &rightQuotient(Character character);
         DFA &determine();
         NFA &nondetermine();
@@ -247,8 +247,8 @@ namespace cgh{
         NFAState *mkNFAInitialState();
         NFAState *mkNFAFinalState();
 
-        NFA &postStar(const PDS& pds, State2Map state2Map);
-        NFA &preStar(const PDS& pds, State2Map state2Map);
+        NFA &postStar(const PDS& pds, State2Map& state2Map);
+        NFA &preStar(const PDS& pds, State2Map& state2Map);
         bool hasEpsilon();
         void removeEpsilon();
         
@@ -290,7 +290,7 @@ namespace cgh{
         
         FA &concat(const FA &fa);
         FA &minus(const FA &fa);
-        FA &subset(State *iState, State *fState);
+        FA &subset(const State *iState, const State *fState);
         FA &rightQuotient(Character character);
         DFA &determine();
         NFA &nondetermine();
