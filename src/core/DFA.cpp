@@ -70,6 +70,7 @@ DFA::DFA(const DFA& dfa)
         State2Map state2Map;
         state2Map[dfa.initialState] = iniState;
         makeCopyTrans(dynamic_cast<DFAState*>(dfa.initialState), state2Map);
+        setDeterminateFlag(1);
     }
 }
 /*******************************************************************/
@@ -103,6 +104,7 @@ DFA::DFA(const RawFaData& data)
         int character = get<1>(transVector[i]);
         stateVector[sourceState]->addDFATrans(character, stateVector[targetState]);
     }
+    setDeterminateFlag(1);
 }
 /*******************************************************************/
 /*                                                                 */
@@ -151,14 +153,18 @@ FA &DFA::operator &(const FA &fa)
     DFA* dfa = new DFA();
     if(!initialState || !fa.initialState) return *dfa;
     dfa->setAlphabet(alphabet);
-    StatePair statePair(initialState, fa.initialState);
+    DFA *tempDFA = NULL;
+    if(!fa.isDeterminate()) tempDFA = &dynamic_cast<const NFA&>(fa).determine();
+    else tempDFA = &dynamic_cast<DFA&>(const_cast<FA&>(fa));
+    StatePair statePair(initialState, tempDFA->initialState);
     DFAState* iniState = dfa->mkDFAInitialState();
-    if(initialState->isFinal() && fa.initialState->isFinal()) dfa->addFinalState(iniState);
+    if(initialState->isFinal() && tempDFA->initialState->isFinal()) dfa->addFinalState(iniState);
     PairMapping pairMapping;
     pairMapping[statePair] = iniState;
     DFAIntersectionMap dfaIntersectionMap;
     getTransMapByStatePair(statePair, dfaIntersectionMap);
     makeDFAIntersectionTrans(iniState, pairMapping, dfaIntersectionMap, dfa);
+    if(!fa.isDeterminate()) delete tempDFA;
     if(dfa->finalStateSet.size() == 0)
     {
         delete dfa;
@@ -175,8 +181,8 @@ FA &DFA::operator &(const FA &fa)
 /*******************************************************************/
 FA &DFA::operator |(const FA &fa)
 {
-    if(!initialState) return const_cast<FA&>(fa).determine();
-    if(!fa.initialState) return determine();
+    if(!initialState) return const_cast<FA&>(fa);
+    if(!fa.initialState) return *this;
     NFA nfa(*this);
     return (nfa | fa);
 }
@@ -185,10 +191,10 @@ FA &DFA::operator |(const FA &fa)
 /*  DFA::concatination                                             */
 /*                                                                 */
 /*******************************************************************/
-FA &DFA::concat(const FA &fa)//todo
+FA &DFA::concat(const FA &fa)
 {
-    if(!initialState) return const_cast<FA&>(fa).determine();
-    if(!fa.initialState) return determine();
+    if(!initialState) return const_cast<FA&>(fa);
+    if(!fa.initialState) return *this;
     NFA nfa(*this);
     return nfa.concat(fa);
 }
@@ -233,8 +239,7 @@ FA &DFA::operator !( void )
     State2Map state2Map;
     DFAState* iniState = dfa->mkDFAInitialState();
     DFAState* trapState = dfa->mkDFAFinalState();
-    AlphabetIter AIter;
-    for(AIter = alphabet.begin(); AIter != alphabet.end(); AIter++)
+    for(AlphabetIter AIter = alphabet.begin(); AIter != alphabet.end(); AIter++)
         trapState->addDFATrans(*AIter, trapState);
     if(!initialState->isFinal()) iniState->setFinalFlag(1);
     state2Map[initialState] = iniState;
@@ -326,7 +331,7 @@ void DFA::removeUnreachableState()
     workSet.insert(initialState);
     reachableStateSet.insert(initialState);
     getReachableStateSet(reachableStateSet, workSet);
-    if(!hasFinalState(reachableStateSet))
+    if(!FA::hasFinalState(reachableStateSet))
     {
         initialState = NULL;
         return;
@@ -460,21 +465,13 @@ DFA& DFA::minimize()
     DFA* dfa = new DFA();
     return *dfa;
 }
-/*******************************************************************/
-/*                                                                 */
-/*  DFA::toDFA                                                     */
-/*                                                                 */
-/*******************************************************************/
-DFA& DFA::determine()
-{
-    return *this;
-}
+
 /*******************************************************************/
 /*                                                                 */
 /*  DFA::toNFA                                                     */
 /*                                                                 */
 /*******************************************************************/
-NFA& DFA::nondetermine()
+NFA& DFA::nondetermine()const
 {
     NFA* nfa = new NFA(*this);
     return *nfa;

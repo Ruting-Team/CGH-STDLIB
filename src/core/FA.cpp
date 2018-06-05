@@ -8,7 +8,7 @@
 #include "FA.hpp"
 using namespace cgh;
 
-bool FA::hasFinalState(const StateSet &stateSet)const
+bool FA::hasFinalState(const StateSet &stateSet)
 {
     StateSetConstIter iter;
     for(iter = stateSet.begin(); iter != stateSet.end(); iter++)
@@ -23,7 +23,11 @@ void FA::clearFinalStateSet()
     finalStateSet.clear();
 }
 
-
+/*******************************************************************/
+/*                                                                 */
+/*  FA::equal                                                      */
+/*                                                                 */
+/*******************************************************************/
 bool FA::operator ==(const FA& fa)
 {
     DFA* cDFA = dynamic_cast<DFA*>(&(!(const_cast<FA&>(fa))));
@@ -46,7 +50,11 @@ bool FA::operator ==(const FA& fa)
     delete iDFA;
     return true;
 }
-
+/*******************************************************************/
+/*                                                                 */
+/*  FA::subset                                                      */
+/*                                                                 */
+/*******************************************************************/
 bool FA::operator <=(const FA& fa)
 {
     DFA* cDFA = dynamic_cast<DFA*>(&(!(const_cast<FA&>(fa))));
@@ -60,6 +68,146 @@ bool FA::operator <=(const FA& fa)
     delete cDFA;
     delete iDFA;
     return true;
+}
+
+/*******************************************************************/
+/*                                                                 */
+/*  FA::multiIntersection                                          */
+/*                                                                 */
+/*******************************************************************/
+void FA::getTransMapByStateSet(const StateSet& stateSet, NFATransMap& nfaTransMap)
+{
+    DFATransMap& transMap = dynamic_cast<DFAState*>(*stateSet.begin())->getDFATransMap();
+    StateSet set;
+    for(DFATransMapIter mapIter = transMap.begin(); mapIter != transMap.end(); mapIter++)
+    {
+        set.clear();
+        set.insert(mapIter->second);
+        for(StateSetConstIter iter = ++stateSet.begin(); iter != stateSet.end(); iter++)
+        {
+            DFAState* state = dynamic_cast<DFAState*>(*iter)->getTargetStateByChar(mapIter->first);
+            if(!state) break;
+            set.insert(state);
+        }
+        if(set.size() == stateSet.size()) nfaTransMap[mapIter->first] = set;
+    }
+}
+
+void FA::makeDFATrans(DFAState* preState, SetMapping &setMapping, const NFATransMap &nfaTransMap, DFA* dfa)
+{
+    NFATransMap transMap;
+    for(NFATransMapConstIter mapIter = nfaTransMap.begin(); mapIter != nfaTransMap.end(); mapIter++)
+    {
+        SetMapping::iterator setMapIter = setMapping.find(mapIter->second);
+        DFAState* postState;
+        if(setMapIter == setMapping.end())
+        {
+            transMap.clear();
+            FA::getTransMapByStateSet(mapIter->second, transMap);
+            if(FA::hasFinalState(mapIter->second)) postState = dfa->mkDFAFinalState();
+            else postState = dfa->mkDFAState();
+            setMapping[mapIter->second] = postState;
+            FA::makeDFATrans(postState, setMapping, transMap, dfa);
+        }
+        else postState = dynamic_cast<DFAState*>(setMapping[mapIter->second]);
+        preState->addDFATrans(mapIter->first, postState);
+    }
+}
+FA &FA::multiIntersection(const FASet& faSet)//todo
+{
+    FASet tempFASet;
+    StateSet set;
+    bool f = true;
+    for(FASetConstIter iter = faSet.begin(); iter != faSet.end(); iter++)
+    {
+        if(!(*iter)->getInitialState()) return FA::EmptyFA();
+        State* iniState = NULL;
+        if(!(*iter)->isDeterminate())
+        {
+            DFA *tempDFA = &dynamic_cast<const NFA*>(*iter)->determine();
+            tempFASet.insert(tempDFA);
+            iniState = tempDFA->initialState;
+        }
+        else iniState = (*iter)->initialState;
+        f &= iniState->isFinal();
+        set.insert(iniState);
+    }
+    DFA *dfa = new DFA();
+    DFAState* iniState = dfa->mkDFAInitialState();
+    if(f) dfa->addFinalState(iniState);
+    SetMapping setMapping;
+    setMapping[set] = iniState;
+    NFATransMap nfaTransMap;
+    FA::getTransMapByStateSet(set, nfaTransMap);
+    FA::makeDFATrans(iniState, setMapping, nfaTransMap, dfa);
+    for(FASetIter iter = tempFASet.begin(); iter != tempFASet.end(); iter++)
+        delete *iter;
+    if(dfa->finalStateSet.size() == 0)
+    {
+        delete dfa;
+        return dynamic_cast<DFA&>(FA::EmptyFA());
+    }
+    dfa->setReachableFlag(1);
+    return *dfa;
+}
+/*******************************************************************/
+/*                                                                 */
+/*  FA::multiUnion                                                 */
+/*                                                                 */
+/*******************************************************************/
+
+FA &FA::multiUnion(const FASet &faSet)
+{
+    NFA *nfa = new NFA();
+    NFAState* iniState = nfa->mkNFAInitialState();
+    State2Map state2Map;
+    for(FASetConstIter iter = faSet.begin(); iter != faSet.end(); iter++)
+    {
+        if(!(*iter)->getInitialState()) continue;
+        state2Map.clear();
+        NFAState* state = nfa->mkNFAState();
+        iniState->addEpsilonTrans(state);
+        if((*iter)->initialState->isFinal()) nfa->addFinalState(state);
+        state2Map[(*iter)->initialState] = state;
+        if((*iter)->isDeterminate())
+            nfa->makeCopyTransByDFA(dynamic_cast<DFAState*>((*iter)->initialState), state2Map);
+        else
+            nfa->makeCopyTransByNFA(dynamic_cast<NFAState*>((*iter)->initialState), state2Map);
+    }
+    return *nfa;
+}
+
+/*******************************************************************/
+/*                                                                 */
+/*  FA::multiConcatination                                         */
+/*                                                                 */
+/*******************************************************************/
+
+FA &FA::multiConcatination(const FAList &faList)
+{
+    NFA *nfa = new NFA();
+    NFAState* iniState = nfa->mkNFAInitialState();
+    State2Map state2Map;
+    StateSet fStateSet;
+    fStateSet.insert(iniState);
+    for(FAListConstIter iter = faList.begin(); iter != faList.end(); iter++)
+    {
+        if(!(*iter)->getInitialState()) continue;
+        state2Map.clear();
+        NFAState* state = nfa->mkNFAState();
+        for(StateSetIter sIter = fStateSet.begin(); sIter != fStateSet.end(); sIter++)
+            dynamic_cast<NFAState*>(*sIter)->addEpsilonTrans(state);
+        fStateSet.clear();
+        nfa->clearFinalStateSet();
+        if((*iter)->initialState->isFinal()) nfa->addFinalState(state);
+        state2Map[(*iter)->initialState] = state;
+        if((*iter)->isDeterminate())
+            nfa->makeCopyTransByDFA(dynamic_cast<DFAState*>((*iter)->initialState), state2Map);
+        else
+            nfa->makeCopyTransByNFA(dynamic_cast<NFAState*>((*iter)->initialState), state2Map);
+        fStateSet.insert(nfa->finalStateSet.begin(), nfa->finalStateSet.end());
+    }
+    return *nfa;
 }
 
 /*******************************************************************/
